@@ -8,4 +8,10 @@ class Loket extends Model
 {
     protected $table = 'loket';
     protected $guarded = [];
+
+    public function antreanAktif()
+    {
+        return $this->hasMany(Antrean::class, 'loket_asal_id');
+    }
 }
+
