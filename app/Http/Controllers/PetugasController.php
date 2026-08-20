@@ -7,6 +7,7 @@ use App\Models\Gerai;
 use App\Models\Loket;
 use App\Models\User;
 use Illuminate\Http\Request;
+use App\Events\AntreanDipanggil;
 
 class PetugasController extends Controller
 {
@@ -72,6 +73,9 @@ class PetugasController extends Controller
             'petugas_id' => $user->id,
         ]);
 
+        // Broadcast event ke Display Realtime
+        event(new AntreanDipanggil($antrean));
+
         return back()->with('success', 'Memanggil nomor ' . $antrean->kode_antrean);
     }
 
@@ -91,15 +95,27 @@ class PetugasController extends Controller
             'petugas_id' => $user->id,
         ]);
 
+        // Broadcast event ke Display Realtime
+        event(new AntreanDipanggil($antrean));
+
         return back()->with('success', 'Memanggil Antrean Bantuan ' . $antrean->kode_antrean);
     }
 
-    // Update Status Antrean (Selesai / Lewati)
+    // Update Status Antrean (Selesai / Lewati / Panggil Ulang)
     public function updateStatus(Request $request, $id)
     {
+        $request->validate([
+            'status' => 'required|in:SERVING,DONE,SKIPPED,CALLED'
+        ]);
+
         $antrean = Antrean::findOrFail($id);
         $antrean->update(['status' => $request->status]);
 
-        return back()->with('success', 'Status antrean diperbarui.');
+        // Kirim sinyal broadcast HANYA jika memanggil ulang (CALLED)
+        if ($request->status === 'CALLED') {
+            event(new AntreanDipanggil($antrean));
+        }
+
+        return back()->with('success', 'Status antrean berhasil diperbarui.');
     }
 }

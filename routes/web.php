@@ -5,10 +5,11 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PetugasController;
 use App\Http\Controllers\DisplayController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\KioskController;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', [KioskController::class, 'index'])->name('kiosk.index');
+Route::get('/kiosk/gerai/{geraiId}', [KioskController::class, 'pilihLoket'])->name('kiosk.loket');
+Route::post('/kiosk/generate-tiket', [KioskController::class, 'generateTiket'])->name('kiosk.cetak');
 
 Route::get('/dashboard', function () {
     return view('dashboard');

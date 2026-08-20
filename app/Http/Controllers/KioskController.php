@@ -20,7 +20,15 @@ class KioskController extends Controller
     // Step 2: Pilih Loket Berdasarkan Gerai
     public function pilihLoket($geraiId)
     {
-        // Hanya ambil loket yang ACTIVE dan MEMILIKI PETUGAS aktif (active_petugas_id != null)
+        $today = now()->toDateString();
+
+        // Validasi Sesi Hari Ini sebelum membuka halaman pilih loket
+        $sesi = SesiHari::where('tanggal', $today)->first();
+        if (!$sesi || !$sesi->is_open) {
+            return back()->with('error', 'Maaf, layanan antrean hari ini belum dibuka atau sudah ditutup.');
+        }
+
+        // Hanya ambil loket yang ACTIVE dan MEMILIKI PETUGAS aktif
         $loketAktif = Loket::where('gerai_id', $geraiId)
             ->where('status', 'ACTIVE')
             ->whereNotNull('active_petugas_id')
@@ -36,15 +44,16 @@ class KioskController extends Controller
     {
         $today = now()->toDateString();
 
-        // Cek Sesi Hari
-        $sesi = SesiHari::firstOrCreate(
-            ['tanggal' => $today],
-            ['status' => 'OPEN']
-        );
-
-        if ($sesi->status === 'CLOSED') {
-            return back()->with('error', 'Layanan antrean hari ini telah ditutup.');
+        // Validasi Sesi Hari Ini
+        $sesi = SesiHari::where('tanggal', $today)->first();
+        if (!$sesi || !$sesi->is_open) {
+            return redirect()->route('kiosk.index')->with('error', 'Maaf, layanan antrean hari ini belum dibuka atau sudah ditutup.');
         }
+
+        $request->validate([
+            'gerai_id' => 'required|exists:gerai,id',
+            'loket_id' => 'required|exists:loket,id',
+        ]);
 
         $geraiId = $request->gerai_id;
         $loketId = $request->loket_id;

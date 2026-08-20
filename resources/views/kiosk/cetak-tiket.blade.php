@@ -4,6 +4,31 @@
     <meta charset="UTF-8">
     <title>Tiket Antrean</title>
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        /* Styling Khusus Kertas Thermal (Abaikan UI Browser) */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #area-cetak, #area-cetak * {
+                visibility: visible;
+            }
+            #area-cetak {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 58mm; /* Ukuran umum kertas thermal mini */
+            }
+        }
+    </style>
+
+    <script>
+        // Otomatis print begitu halaman tiket terbuka
+        window.onload = function() {
+            window.print();
+        }
+    </script>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
     <div class="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm w-full border">

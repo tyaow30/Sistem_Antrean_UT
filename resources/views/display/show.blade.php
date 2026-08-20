@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <title>Display Antrean - {{ $gerai->nama_gerai }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+
+    @vite(['resources/js/app.js'])
 </head>
 <body class="bg-slate-900 text-white min-h-screen flex flex-col justify-between p-8">
     
@@ -38,10 +40,9 @@
     </footer>
 
     <script>
-        let lastCalledId = null;
         let isAudioAllowed = false;
 
-        // Izinkan audio diputar setelah ada interaksi pengguna
+        // Izinkan audio diputar setelah ada interaksi pengguna (kebijakan browser)
         document.body.addEventListener('click', () => {
             isAudioAllowed = true;
         }, { once: true });
@@ -62,8 +63,8 @@
             window.speechSynthesis.speak(utterance);
         }
 
-        // Fetch Data Antrean Realtime (Polling tiap 2 detik)
-        async function checkAntrean() {
+        // 1. Fetch Data Awal saat Layar Pertama Dimuat
+        async function fetchInitialData() {
             try {
                 const response = await fetch("{{ route('api.display.latest', $gerai->id) }}");
                 const data = await response.json();
@@ -71,33 +72,53 @@
                 if (data.aktif) {
                     const nomor = data.aktif.kode_antrean;
                     const loket = data.aktif.loket_melayani ? data.aktif.loket_melayani.nomor_loket : '-';
-
                     document.getElementById('nomor-aktif').innerText = nomor;
                     document.getElementById('loket-aktif').innerText = `SILAKAN KE LOKET ${loket}`;
-
-                    // Jika ada antrean baru yang dipanggil, jalankan suara
-                    if (lastCalledId !== data.aktif.id) {
-                        lastCalledId = data.aktif.id;
-                        speak(`Nomor antrean ${nomor}, silahkan menuju ke loket ${loket}`);
-                    }
                 }
 
-                // Update Riwayat
-                if (data.riwayat && data.riwayat.length > 0) {
-                    const listHtml = data.riwayat.map(item => `
-                        <div class="flex justify-between items-center bg-slate-700/50 p-3 rounded-xl border border-slate-600">
-                            <span class="text-2xl font-black text-amber-300">${item.kode_antrean}</span>
-                            <span class="text-sm font-semibold text-slate-300">Loket ${item.loket_melayani ? item.loket_melayani.nomor_loket : '-'}</span>
-                        </div>
-                    `).join('');
-                    document.getElementById('daftar-riwayat').innerHTML = listHtml;
-                }
+                updateRiwayatUI(data.riwayat);
             } catch (err) {
-                console.error("Gagal mengambil data display:", err);
+                console.error("Gagal memuat data awal display:", err);
             }
         }
 
-        setInterval(checkAntrean, 2000);
+        // Fungsi Helper Update Riwayat
+        function updateRiwayatUI(riwayat) {
+            if (riwayat && riwayat.length > 0) {
+                const listHtml = riwayat.map(item => `
+                    <div class="flex justify-between items-center bg-slate-700/50 p-3 rounded-xl border border-slate-600">
+                        <span class="text-2xl font-black text-amber-300">${item.kode_antrean}</span>
+                        <span class="text-sm font-semibold text-slate-300">Loket ${item.loket_melayani ? item.loket_melayani.nomor_loket : '-'}</span>
+                    </div>
+                `).join('');
+                document.getElementById('daftar-riwayat').innerHTML = listHtml;
+            }
+        }
+
+        // Jalankan Data Awal
+        fetchInitialData();
+
+        // 2. Listener Realtime Laravel Reverb (WebSocket)
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof window.Echo !== 'undefined') {
+                window.Echo.channel(`display-gerai.{{ $gerai->id }}`)
+                    .listen('.antrean.dipanggil', (e) => {
+                        const antrean = e.antrean;
+                        const nomor = antrean.kode_antrean;
+                        const loket = antrean.loket_melayani ? antrean.loket_melayani.nomor_loket : '-';
+
+                        // Update Layar Utama
+                        document.getElementById('nomor-aktif').innerText = nomor;
+                        document.getElementById('loket-aktif').innerText = `SILAKAN KE LOKET ${loket}`;
+
+                        // Bunyikan Suara Pemanggilan Instant
+                        speak(`Nomor antrean ${nomor}, silahkan menuju ke loket ${loket}`);
+
+                        // Ambil ulang riwayat terbaru
+                        fetchInitialData();
+                    });
+            }
+        });
     </script>
 </body>
 </html>

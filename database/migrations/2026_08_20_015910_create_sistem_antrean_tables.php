@@ -49,7 +49,7 @@ return new class extends Migration
         Schema::create('sesi_hari', function (Blueprint $table) {
             $table->id();
             $table->date('tanggal')->unique();
-            $table->enum('status', ['OPEN', 'CLOSED'])->default('OPEN');
+            $table->boolean('is_open')->default(false);
             $table->timestamps();
         });
     }
