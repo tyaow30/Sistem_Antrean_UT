@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PetugasController;
+use App\Http\Controllers\DisplayController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -24,5 +25,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/petugas/panggil-bantuan/{id}', [PetugasController::class, 'panggilBantuan'])->name('petugas.panggil-bantuan');
     Route::post('/petugas/status/{id}', [PetugasController::class, 'updateStatus'])->name('petugas.status');
 });
+
+Route::get('/display/{geraiId}', [DisplayController::class, 'show'])->name('display.show');
+Route::get('/api/display/{geraiId}/latest', [DisplayController::class, 'getLatest'])->name('api.display.latest');
 
 require __DIR__.'/auth.php';
