@@ -3,23 +3,50 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Gerai;
+use App\Models\Loket;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // Gerai Sample
+        $gerai = Gerai::create([
+            'nama_gerai' => 'Gerai Utama',
+            'is_active' => true,
+        ]);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        // Loket Sample
+        $loket1 = Loket::create([
+            'gerai_id' => $gerai->id,
+            'nomor_loket' => 1,
+            'status' => 'ACTIVE',
+        ]);
+
+        $loket2 = Loket::create([
+            'gerai_id' => $gerai->id,
+            'nomor_loket' => 2,
+            'status' => 'ACTIVE',
+        ]);
+
+        // Akun Admin
+        User::create([
+            'name' => 'Administrator',
+            'email' => 'admin@gmail.com',
+            'password' => Hash::make('password123'),
+            'role' => 'ADMIN',
+        ]);
+
+        // Akun Petugas Loket 1
+        User::create([
+            'name' => 'Budi Petugas',
+            'email' => 'petugas1@gmail.com',
+            'password' => Hash::make('password123'),
+            'role' => 'PETUGAS',
+            'assigned_gerai_id' => $gerai->id,
+            'assigned_loket_id' => $loket1->id,
         ]);
     }
 }
