@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PetugasController;
 use App\Http\Controllers\DisplayController;
+use App\Http\Controllers\AdminController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -20,10 +21,15 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+    // petugas
     Route::get('/petugas/dashboard', [PetugasController::class, 'index'])->name('petugas.dashboard');
     Route::post('/petugas/panggil-berikutnya', [PetugasController::class, 'panggilBerikutnya'])->name('petugas.panggil');
     Route::post('/petugas/panggil-bantuan/{id}', [PetugasController::class, 'panggilBantuan'])->name('petugas.panggil-bantuan');
     Route::post('/petugas/status/{id}', [PetugasController::class, 'updateStatus'])->name('petugas.status');
+
+    // admin
+    Route::get('/admin/dashboard', [AdminController::class, 'index'])->name('admin.dashboard');
+    Route::post('/admin/toggle-sesi', [AdminController::class, 'toggleSesi'])->name('admin.toggle-sesi');
 });
 
 Route::get('/display/{geraiId}', [DisplayController::class, 'show'])->name('display.show');
