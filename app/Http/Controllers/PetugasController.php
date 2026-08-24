@@ -168,10 +168,24 @@ class PetugasController extends Controller
         $user = auth()->user();
         $today = now()->toDateString();
 
+        if (!$user->assigned_loket_id) {
+            return back()->with('error', 'Anda belum memiliki loket.');
+        }
+
+        $loket = Loket::where('id', $user->assigned_loket_id)
+            ->where('status', 'ACTIVE')
+            ->where('active_petugas_id', $user->id)
+            ->first();
+
+        if (!$loket) {
+            return back()->with('error', 'Loket Anda tidak aktif.');
+        }
+
         // Pastikan antrean memang milik petugas yang sedang login
         $antrean = Antrean::where('id', $id)
             ->where('tanggal', $today)
             ->where('petugas_id', $user->id)
+            ->where('loket_melayani_id', $loket->id)
             ->whereIn('status', ['CALLED', 'SERVING'])
             ->first();
 
@@ -179,6 +193,21 @@ class PetugasController extends Controller
             return back()->with(
                 'error',
                 'Antrean tidak ditemukan atau bukan antrean yang sedang Anda layani.'
+            );
+        }
+
+        $allowedTransitions = [
+            'CALLED' => ['SERVING', 'SKIPPED', 'CALLED'],
+            'SERVING' => ['DONE', 'SKIPPED'],
+        ];
+
+        if (!in_array(
+            $request->status,
+            $allowedTransitions[$antrean->status] ?? []
+        )) {
+            return back()->with(
+                'error',
+                'Perubahan status antrean tidak valid.'
             );
         }
 
