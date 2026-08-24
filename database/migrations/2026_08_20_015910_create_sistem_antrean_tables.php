@@ -40,7 +40,7 @@ return new class extends Migration
             $table->foreignId('loket_asal_id')->constrained('loket')->onDelete('cascade');
             $table->foreignId('loket_melayani_id')->nullable()->constrained('loket')->nullOnDelete();
             $table->foreignId('petugas_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->enum('status', ['WAITING', 'CALLING', 'SERVING', 'DONE', 'SKIPPED'])->default('WAITING');
+            $table->enum('status', ['WAITING', 'PRINTING', 'CALLED', 'SERVING', 'DONE', 'SKIPPED'])->default('WAITING');
             $table->date('tanggal');
             $table->timestamps();
         });

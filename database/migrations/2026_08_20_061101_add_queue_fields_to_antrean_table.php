@@ -45,8 +45,9 @@ return new class extends Migration
         DB::statement("
             ALTER TABLE antrean
             MODIFY status ENUM(
+                'PRINTING',
                 'WAITING',
-                'CALLING',
+                'CALLED',
                 'SERVING',
                 'DONE',
                 'SKIPPED'
