@@ -17,66 +17,88 @@ class KioskController extends Controller
         return view('kiosk.pilih-gerai', compact('gerai'));
     }
 
-    // Step 2: Pilih Loket Berdasarkan Gerai
-    public function pilihLoket($geraiId)
+    // Halaman Pilih Loket / Cetak Tiket berdasarkan Gerai
+    public function pilihGerai($id)
     {
-        $today = now()->toDateString();
+        $gerai = Gerai::with(['loket' => function ($query) {
+            $query->where('status', 'ACTIVE')
+                ->whereNotNull('active_petugas_id');
+        }])->findOrFail($id);
+        
+        // Cek Sesi Aktif
+        $sesi = SesiHari::where('is_open', true)->latest()->first();
 
-        // Validasi Sesi Hari Ini sebelum membuka halaman pilih loket
-        $sesi = SesiHari::where('tanggal', $today)->first();
-        if (!$sesi || !$sesi->is_open) {
-            return back()->with('error', 'Maaf, layanan antrean hari ini belum dibuka atau sudah ditutup.');
+        if (!$sesi) {
+            return back()->with('error', 'Mohon maaf, sesi antrean saat ini sedang ditutup!');
         }
 
-        // Hanya ambil loket yang ACTIVE dan MEMILIKI PETUGAS aktif
-        $loketAktif = Loket::where('gerai_id', $geraiId)
-            ->where('status', 'ACTIVE')
-            ->whereNotNull('active_petugas_id')
-            ->get();
-
-        $gerai = Gerai::findOrFail($geraiId);
-
-        return view('kiosk.pilih-loket', compact('loketAktif', 'gerai'));
+        return view('kiosk.pilih-loket', compact('gerai'));
     }
 
-    // Step 3: Simpan Transaksi & Cetak Tiket
-    public function generateTiket(Request $request)
+    // Process Cetak Tiket
+    public function cetakTiket($loket_id)
     {
-        $today = now()->toDateString();
+        // 1. Pastikan Ada Sesi Aktif
+        $sesi = SesiHari::where('is_open', true)->latest()->first();
 
-        // Validasi Sesi Hari Ini
-        $sesi = SesiHari::where('tanggal', $today)->first();
-        if (!$sesi || !$sesi->is_open) {
-            return redirect()->route('kiosk.index')->with('error', 'Maaf, layanan antrean hari ini belum dibuka atau sudah ditutup.');
+        if (!$sesi) {
+            return redirect()->route('kiosk.index')->with('error', 'Sesi antrean sedang ditutup!');
         }
 
-        $request->validate([
-            'gerai_id' => 'required|exists:gerai,id',
-            'loket_id' => 'required|exists:loket,id',
-        ]);
+        $loket = Loket::findOrFail($loket_id);
 
-        $geraiId = $request->gerai_id;
-        $loketId = $request->loket_id;
+        // 2. Ambil nomor antrean terakhir KHUSUS untuk Sesi Hari ini
+        $lastAntrean = Antrean::where('sesi_hari_id', $sesi->id)
+            ->where('loket_asal_id', $loket->id)
+            ->max('nomor_antrean') ?? 0;
 
-        $loket = Loket::findOrFail($loketId);
-
-        // Cari nomor urut terakhir di loket tersebut untuk hari ini
-        $lastAntrean = Antrean::where('tanggal', $today)
-            ->where('loket_asal_id', $loketId)
-            ->max('nomor_urut') ?? 0;
-
-        $nextUrut = $lastAntrean + 1;
-        $kodeAntrean = sprintf("G%d-L%d-%03d", $geraiId, $loket->nomor_loket, $nextUrut);
+        $nomorBaru = $lastAntrean + 1;
+        $kodeAntrean = 'G' . $loket->gerai_id . '-L' . $loket->nomor_loket . '-' . str_pad($nomorBaru, 3, '0', STR_PAD_LEFT);
 
         $antrean = Antrean::create([
-            'tanggal' => $today,
+            'sesi_hari_id' => $sesi->id,
+            'tanggal' => $sesi->tanggal,
+            'gerai_id' => $loket->gerai_id,
+            'loket_asal_id' => $loket->id,
+            'loket_melayani_id' => $loket->id,
+            'nomor_antrean' => $nomorBaru,
             'kode_antrean' => $kodeAntrean,
-            'nomor_urut' => $nextUrut,
-            'gerai_id' => $geraiId,
-            'loket_asal_id' => $loketId,
-            'status' => 'WAITING',
+            'status' => 'PRINTING',
+            'waktu_ambil' => now(),
         ]);
 
         return view('kiosk.cetak-tiket', compact('antrean', 'loket'));
+    }
+
+    public function confirmCetak($id)
+    {
+        $antrean = Antrean::findOrFail($id);
+
+        if ($antrean->status !== 'PRINTING') {
+            return redirect()
+                ->route('kiosk.index')
+                ->with('error', 'Tiket sudah diproses.');
+        }
+
+        $antrean->update([
+            'status' => 'WAITING',
+        ]);
+
+        return redirect()->route('kiosk.index');
+    }
+
+    public function cancelCetak($id)
+    {
+        $antrean = Antrean::findOrFail($id);
+
+        if ($antrean->status !== 'PRINTING') {
+            return redirect()
+                ->route('kiosk.index')
+                ->with('error', 'Tiket sudah diproses.');
+        }
+
+        $antrean->delete();
+
+        return redirect()->route('kiosk.index');
     }
 }

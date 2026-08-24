@@ -23,6 +23,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'active_session_id',
         'role',
         'assigned_gerai_id',
         'assigned_loket_id',
@@ -54,7 +55,7 @@ class User extends Authenticatable
     /**
      * Relasi ke Loket yang ditugaskan
      */
-    public function loket()
+    public function assignedLoket()
     {
         return $this->belongsTo(Loket::class, 'assigned_loket_id');
     }
@@ -62,8 +63,19 @@ class User extends Authenticatable
     /**
      * Relasi ke Gerai yang ditugaskan
      */
-    public function gerai()
+    public function assignedGerai()
     {
         return $this->belongsTo(Gerai::class, 'assigned_gerai_id');
+    }
+
+    // Alias untuk kompatibilitas kode lama
+    public function loket()
+    {
+        return $this->assignedLoket();
+    }
+
+    public function gerai()
+    {
+        return $this->assignedGerai();
     }
 }

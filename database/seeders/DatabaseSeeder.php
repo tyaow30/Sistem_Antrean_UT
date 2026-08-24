@@ -18,17 +18,19 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        // Loket Sample
+        // Loket Sample (Set INACTIVE & active_petugas_id null secara default)
         $loket1 = Loket::create([
             'gerai_id' => $gerai->id,
             'nomor_loket' => 1,
-            'status' => 'ACTIVE',
+            'status' => 'INACTIVE',
+            'active_petugas_id' => null,
         ]);
 
         $loket2 = Loket::create([
             'gerai_id' => $gerai->id,
             'nomor_loket' => 2,
-            'status' => 'ACTIVE',
+            'status' => 'INACTIVE',
+            'active_petugas_id' => null,
         ]);
 
         // Akun Admin

@@ -12,7 +12,7 @@
 
         <div class="grid grid-cols-2 gap-4">
             @forelse($gerai as $g)
-                <a href="{{ route('kiosk.loket', $g->id) }}" 
+                <a href="{{ route('kiosk.gerai', $g->id) }}" 
                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-6 px-4 rounded-xl shadow-lg text-xl transition">
                     {{ $g->nama_gerai }}
                 </a>

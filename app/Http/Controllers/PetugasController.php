@@ -8,6 +8,7 @@ use App\Models\Loket;
 use App\Models\User;
 use Illuminate\Http\Request;
 use App\Events\AntreanDipanggil;
+use Illuminate\Support\Facades\DB;
 
 class PetugasController extends Controller
 {
@@ -40,14 +41,40 @@ class PetugasController extends Controller
             ->get();
 
         // 4. Antrean Bantuan (Waiting dari loket lain di gerai yang sama)
-        $antreanBantuan = Antrean::where('tanggal', $today)
-            ->where('gerai_id', $user->assigned_gerai_id)
-            ->where('loket_asal_id', '!=', $user->assigned_loket_id)
-            ->where('status', 'WAITING')
-            ->orderBy('id', 'asc')
-            ->get();
+        // $antreanBantuan = Antrean::where('tanggal', $today)
+        //     ->where('gerai_id', $user->assigned_gerai_id)
+        //     ->where('loket_asal_id', '!=', $user->assigned_loket_id)
+        //     ->where('status', 'WAITING')
+        //     ->orderBy('id', 'asc')
+        //     ->get();
 
-        return view('petugas.dashboard', compact('antreanSaatIni', 'antreanSaya', 'antreanBantuan', 'user'));
+        // return view('petugas.dashboard', compact('antreanSaatIni', 'antreanSaya', 'antreanBantuan', 'user'));
+
+        // 4. Antrean Bantuan
+        $antreanBantuan = collect();
+
+        $adaAntreanSendiri = $antreanSaya->isNotEmpty();
+
+        $adaPetugasLogout = Loket::where('gerai_id', $user->assigned_gerai_id)
+            ->where('id', '!=', $user->assigned_loket_id)
+            ->whereNull('active_petugas_id')
+            ->exists();
+
+        if (!$adaAntreanSendiri || $adaPetugasLogout) {
+            $antreanBantuan = Antrean::where('tanggal', $today)
+                ->where('gerai_id', $user->assigned_gerai_id)
+                ->where('loket_asal_id', '!=', $user->assigned_loket_id)
+                ->where('status', 'WAITING')
+                ->orderBy('id', 'asc')
+                ->get();
+        }
+
+        return view('petugas.dashboard', compact(
+            'antreanSaatIni',
+            'antreanSaya',
+            'antreanBantuan',
+            'user'
+        ));
     }
 
     // Panggil Antrean Berikutnya di Loket Sendiri
@@ -56,6 +83,16 @@ class PetugasController extends Controller
         /** @var \App\Models\User $user */
         $user = auth()->user();
         $today = now()->toDateString();
+
+        // Cek apakah masih ada antrean yang belum diselesaikan/dilewati oleh petugas ini
+        $sedangDilayani = Antrean::where('tanggal', $today)
+            ->where('petugas_id', $user->id)
+            ->whereIn('status', ['CALLED', 'SERVING'])
+            ->exists();
+
+        if ($sedangDilayani) {
+            return back()->with('error', 'Selesaikan atau lewati antrean saat ini terlebih dahulu!');
+        }
 
         $antrean = Antrean::where('tanggal', $today)
             ->where('loket_asal_id', $user->assigned_loket_id)
@@ -71,12 +108,13 @@ class PetugasController extends Controller
             'status' => 'CALLED',
             'loket_melayani_id' => $user->assigned_loket_id,
             'petugas_id' => $user->id,
+            'waktu_panggil' => now(),
         ]);
 
         // Broadcast event ke Display Realtime
         event(new AntreanDipanggil($antrean));
 
-        return back()->with('success', 'Memanggil nomor ' . $antrean->kode_antrean);
+        return back()->with('success', 'Memanggil nomor ' . ($antrean->kode_antrean ?? $antrean->nomor_antrean));
     }
 
     // Panggil Antrean Bantuan dari Loket Lain
@@ -84,34 +122,83 @@ class PetugasController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = auth()->user();
+        $today = now()->toDateString();
+
+        // Cek apakah masih ada antrean yang belum diselesaikan
+        $sedangDilayani = Antrean::where('tanggal', $today)
+            ->where('petugas_id', $user->id)
+            ->whereIn('status', ['CALLED', 'SERVING'])
+            ->exists();
+
+        if ($sedangDilayani) {
+            return back()->with('error', 'Selesaikan atau lewati antrean saat ini terlebih dahulu!');
+        }
 
         $antrean = Antrean::where('id', $id)
+            ->where('tanggal', $today)
+            ->where('gerai_id', $user->assigned_gerai_id)
+            ->where('loket_asal_id', '!=', $user->assigned_loket_id)
             ->where('status', 'WAITING')
-            ->firstOrFail();
+            ->first();
+
+        if (!$antrean) {
+            return back()->with('error', 'Antrean bantuan sudah dipanggil oleh petugas lain!');
+        }
 
         $antrean->update([
             'status' => 'CALLED',
             'loket_melayani_id' => $user->assigned_loket_id,
             'petugas_id' => $user->id,
+            'waktu_panggil' => now(),
         ]);
 
         // Broadcast event ke Display Realtime
         event(new AntreanDipanggil($antrean));
 
-        return back()->with('success', 'Memanggil Antrean Bantuan ' . $antrean->kode_antrean);
+        return back()->with('success', 'Memanggil Antrean Bantuan ' . ($antrean->kode_antrean ?? $antrean->nomor_antrean));
     }
 
-    // Update Status Antrean (Selesai / Lewati / Panggil Ulang)
+    // Update Status Antrean (Selesai / Lewati / Panggil Ulang / Mulai Melayani)
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
-            'status' => 'required|in:SERVING,DONE,SKIPPED,CALLED'
+            'status' => 'required|in:SERVING,DONE,SKIPPED,CALLED',
         ]);
 
-        $antrean = Antrean::findOrFail($id);
-        $antrean->update(['status' => $request->status]);
+        $user = auth()->user();
+        $today = now()->toDateString();
 
-        // Kirim sinyal broadcast HANYA jika memanggil ulang (CALLED)
+        // Pastikan antrean memang milik petugas yang sedang login
+        $antrean = Antrean::where('id', $id)
+            ->where('tanggal', $today)
+            ->where('petugas_id', $user->id)
+            ->whereIn('status', ['CALLED', 'SERVING'])
+            ->first();
+
+        if (!$antrean) {
+            return back()->with(
+                'error',
+                'Antrean tidak ditemukan atau bukan antrean yang sedang Anda layani.'
+            );
+        }
+
+        $updateData = [
+            'status' => $request->status,
+        ];
+
+        // Catat waktu mulai melayani
+        if ($request->status === 'SERVING' && !$antrean->waktu_layani) {
+            $updateData['waktu_layani'] = now();
+        }
+
+        // Catat waktu selesai
+        if ($request->status === 'DONE' && !$antrean->waktu_selesai) {
+            $updateData['waktu_selesai'] = now();
+        }
+
+        $antrean->update($updateData);
+
+        // Broadcast hanya ketika antrean dipanggil ulang
         if ($request->status === 'CALLED') {
             event(new AntreanDipanggil($antrean));
         }

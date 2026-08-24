@@ -31,12 +31,12 @@
                     </div>
 
                     <div class="grid grid-cols-2 gap-2">
-                        <form action="{{ route('petugas.status', $antreanSaatIni->id) }}" method="POST">
+                        <form action="{{ route('petugas.update-status', $antreanSaatIni->id) }}" method="POST">
                             @csrf
                             <input type="hidden" name="status" value="DONE">
                             <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg">Selesai</button>
                         </form>
-                        <form action="{{ route('petugas.status', $antreanSaatIni->id) }}" method="POST">
+                        <form action="{{ route('petugas.update-status', $antreanSaatIni->id) }}" method="POST">
                             @csrf
                             <input type="hidden" name="status" value="SKIPPED">
                             <button type="submit" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 rounded-lg">Lewati</button>
@@ -44,7 +44,7 @@
                     </div>
                 @else
                     <div class="text-center py-8 text-gray-400">Belum ada antrean dipanggil</div>
-                    <form action="{{ route('petugas.panggil') }}" method="POST">
+                    <form action="{{ route('petugas.panggil-next') }}" method="POST">
                         @csrf
                         <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg text-lg">
                             PANGGIL NEXT

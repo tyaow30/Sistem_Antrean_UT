@@ -23,7 +23,7 @@ return new class extends Migration
             $table->foreignId('gerai_id')->constrained('gerai')->onDelete('cascade');
             $table->integer('nomor_loket');
             $table->enum('status', ['ACTIVE', 'INACTIVE', 'BREAK'])->default('INACTIVE');
-            $table->unsignedBigInteger('active_petugas_id')->nullable();
+            $table->foreignId('active_petugas_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });
 
@@ -35,14 +35,13 @@ return new class extends Migration
 
         Schema::create('antrean', function (Blueprint $table) {
             $table->id();
+            $table->string('nomor_antrean'); // contoh: G1-L1-001
+            $table->foreignId('gerai_id')->constrained('gerai')->onDelete('cascade');
+            $table->foreignId('loket_asal_id')->constrained('loket')->onDelete('cascade');
+            $table->foreignId('loket_melayani_id')->nullable()->constrained('loket')->nullOnDelete();
+            $table->foreignId('petugas_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->enum('status', ['WAITING', 'CALLING', 'SERVING', 'DONE', 'SKIPPED'])->default('WAITING');
             $table->date('tanggal');
-            $table->string('kode_antrean');
-            $table->integer('nomor_urut');
-            $table->foreignId('gerai_id')->constrained('gerai');
-            $table->foreignId('loket_asal_id')->constrained('loket');
-            $table->foreignId('loket_melayani_id')->nullable()->constrained('loket');
-            $table->foreignId('petugas_id')->nullable()->constrained('users');
-            $table->enum('status', ['WAITING', 'CALLED', 'SERVING', 'DONE', 'SKIPPED'])->default('WAITING');
             $table->timestamps();
         });
 
