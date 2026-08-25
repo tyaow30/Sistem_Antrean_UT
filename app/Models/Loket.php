@@ -7,11 +7,22 @@ use Illuminate\Database\Eloquent\Model;
 class Loket extends Model
 {
     protected $table = 'loket';
-    protected $guarded = [];
+
+    protected $fillable = [
+        'gerai_id',
+        'nomor_loket',
+        'status',
+        'active_petugas_id',
+        'last_heartbeat_at',
+    ];
+
+    protected $casts = [
+        'last_heartbeat_at' => 'datetime',
+    ];
 
     public function gerai()
     {
-        return $this->belongsTo(Gerai::class, 'gerai_id');
+        return $this->belongsTo(Gerai::class);
     }
 
     public function petugasAktif()

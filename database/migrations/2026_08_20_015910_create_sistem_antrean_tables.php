@@ -58,6 +58,55 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('sistem_antrean_tables');
+        /*
+        * Hapus tabel yang memiliki foreign key terlebih dahulu.
+        */
+
+        // Antrean bergantung kepada:
+        // sesi_hari, gerai, loket, users
+        Schema::dropIfExists('antrean');
+
+        /*
+        * users mempunyai assigned_gerai_id dan
+        * assigned_loket_id.
+        *
+        * Karena migration ini menambahkan kolom tersebut,
+        * hapus kolomnya sebelum tabel gerai/loket.
+        */
+        if (Schema::hasTable('users')) {
+            Schema::table('users', function (Blueprint $table) {
+
+                if (Schema::hasColumn('users', 'assigned_loket_id')) {
+                    $table->dropForeign(['assigned_loket_id']);
+                    $table->dropColumn('assigned_loket_id');
+                }
+
+                if (Schema::hasColumn('users', 'assigned_gerai_id')) {
+                    $table->dropForeign(['assigned_gerai_id']);
+                    $table->dropColumn('assigned_gerai_id');
+                }
+
+                if (Schema::hasColumn('users', 'role')) {
+                    $table->dropColumn('role');
+                }
+            });
+        }
+
+        /*
+        * Sekarang loket bisa dihapus.
+        *
+        * loket.active_petugas_id → users
+        */
+        Schema::dropIfExists('loket');
+
+        /*
+        * Gerai sekarang aman dihapus.
+        */
+        Schema::dropIfExists('gerai');
+
+        /*
+        * Sesi hari tidak lagi direferensikan antrean.
+        */
+        Schema::dropIfExists('sesi_hari');
     }
 };

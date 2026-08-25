@@ -31,26 +31,35 @@ class AuthenticatedSessionController extends Controller
 
         $user = $request->user();
 
-        // Cek khusus untuk PETUGAS
+        // ==========================================
+        // CEK KHUSUS PETUGAS
+        // ==========================================
         if ($user->role === 'PETUGAS') {
 
-            // Kalau akun sedang dipakai di perangkat/browser lain
+            // Kalau akun masih tercatat sedang digunakan
             if ($user->active_session_id !== null) {
 
-                // Hapus session login yang baru saja dibuat
                 Auth::guard('web')->logout();
 
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
 
-                return back()->with('error', 'Akun petugas ini sedang digunakan di perangkat lain. Silakan logout terlebih dahulu.');
+                return back()
+                    ->withInput($request->only('email'))
+                    ->withErrors([
+                        'email' => 'Akun petugas ini sedang digunakan di perangkat lain. Silakan logout terlebih dahulu.',
+                    ]);
             }
 
-            // Simpan session ID login saat ini
+            // Simpan session ID yang sedang digunakan
             $user->update([
                 'active_session_id' => $request->session()->getId(),
             ]);
         }
+
+        // ==========================================
+        // REDIRECT
+        // ==========================================
 
         if ($user->role === 'ADMIN') {
             return redirect()->route('admin.dashboard');
