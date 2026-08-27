@@ -11,7 +11,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 
-
 class AdminController extends Controller
 {
     public function index()
@@ -87,7 +86,6 @@ class AdminController extends Controller
                 ]);
 
                 // Semua loket ACTIVE menjadi INACTIVE.
-                // active_petugas_id tetap dipertahankan.
                 Loket::where('status', 'ACTIVE')
                     ->update([
                         'status' => 'INACTIVE',
@@ -185,6 +183,7 @@ class AdminController extends Controller
             "Gerai berhasil {$status}!"
         );
     }
+
     public function destroyGerai($id)
     {
         $gerai = Gerai::with('loket')->findOrFail($id);
@@ -202,39 +201,65 @@ class AdminController extends Controller
         return back()->with('success', 'Gerai beserta loket di dalamnya berhasil dihapus!');
     }
 
-        public function showGeraiDetail($id)
-        {
-        $gerai = \App\Models\Gerai::with(['loket'])->findOrFail($id);
-        $petugas = \App\Models\User::where('role', 'PETUGAS')
-                                    ->where('gerai_id', $id)
-                                    ->get();
+    // HALAMAN DETAIL GERAI
+    public function showGeraiDetail(Request $request, $id)
+    {
+        $gerai = Gerai::findOrFail($id);
 
-        return view('admin.gerai-detail', compact('gerai', 'petugas'));
-        }
+        // Paginate Loket (misal 5 data per halaman)
+        $loketList = Loket::where('gerai_id', $id)
+            ->paginate(5, ['*'], 'loket_page');
+
+        // Ambil semua petugas di gerai ini/tanpa gerai untuk dropdown penugasan loket
+        $allPetugas = User::where('role', 'PETUGAS')
+            ->where(function ($query) use ($id) {
+                $query->where('gerai_id', $id)
+                    ->orWhereNull('gerai_id');
+            })
+            ->get();
+
+        // Paginate Tabel Direktori Petugas (misal 5 data per halaman)
+        $petugasList = User::where('role', 'PETUGAS')
+            ->where(function ($query) use ($id) {
+                $query->where('gerai_id', $id)
+                    ->orWhereNull('gerai_id');
+            })
+            ->paginate(5, ['*'], 'petugas_page');
+
+        return view('admin.gerai-detail', compact('gerai', 'loketList', 'allPetugas', 'petugasList'));
+    }
 
     // CRUD LOKET
     public function storeLoket(Request $request)
     {
-        // 1. Validasi data
         $request->validate([
             'gerai_id'          => 'required|exists:gerai,id',
             'nomor_loket'       => 'required|string|max:50',
             'active_petugas_id' => 'nullable|exists:users,id',
         ]);
-        // 2. Cek apakah petugas yang dipilih sudah terpakai di loket lain (Opsional tapi aman)
+
         if ($request->filled('active_petugas_id')) {
             $petugasSudahPakai = Loket::where('active_petugas_id', $request->active_petugas_id)->exists();
             if ($petugasSudahPakai) {
                 return redirect()->back()->withErrors(['active_petugas_id' => 'Petugas ini sudah ditugaskan di loket lain!'])->withInput();
             }
         }
-        // 3. Simpan loket baru dengan memasukkan active_petugas_id secara eksplisit
-        Loket::create([
-            'gerai_id'          => $request->gerai_id,
-            'nomor_loket'       => $request->nomor_loket,
-            'active_petugas_id' => $request->active_petugas_id,
-            'status'            => 'INACTIVE',
-        ]);
+
+        DB::transaction(function () use ($request) {
+            $loket = Loket::create([
+                'gerai_id'          => $request->gerai_id,
+                'nomor_loket'       => $request->nomor_loket,
+                'active_petugas_id' => $request->active_petugas_id,
+                'status'            => 'INACTIVE',
+            ]);
+
+            if ($request->filled('active_petugas_id')) {
+                User::where('id', $request->active_petugas_id)->update([
+                    'gerai_id'         => $request->gerai_id,
+                    'assigned_loket_id' => $loket->id,
+                ]);
+            }
+        });
 
         return redirect()->back()->with('success', 'Loket dan penugasan petugas berhasil disimpan!');
     }
@@ -248,7 +273,6 @@ class AdminController extends Controller
 
         $loket = Loket::findOrFail($id);
 
-        // Cegah nomor duplikat
         $exists = Loket::where('gerai_id', $request->gerai_id)
             ->where('nomor_loket', $request->nomor_loket)
             ->where('id', '!=', $loket->id)
@@ -257,10 +281,7 @@ class AdminController extends Controller
         if ($exists) {
             return back()
                 ->withInput()
-                ->with(
-                    'error',
-                    'Nomor loket tersebut sudah ada di gerai ini!'
-                );
+                ->with('error', 'Nomor loket tersebut sudah ada di gerai ini!');
         }
 
         if (
@@ -270,22 +291,7 @@ class AdminController extends Controller
         ) {
             return back()
                 ->withInput()
-                ->with(
-                    'error',
-                    'Loket yang sedang aktif dan memiliki petugas tidak dapat dipindahkan ke gerai lain. Nonaktifkan loket atau lepaskan petugas terlebih dahulu.'
-                );
-        }
-
-        if (
-            $loket->active_petugas_id &&
-            (int) $loket->gerai_id !== (int) $request->gerai_id
-        ) {
-            return back()
-                ->withInput()
-                ->with(
-                    'error',
-                    'Loket yang masih memiliki penugasan petugas tidak dapat dipindahkan. Ubah penugasan petugas terlebih dahulu.'
-                );
+                ->with('error', 'Loket yang sedang aktif dan memiliki petugas tidak dapat dipindahkan ke gerai lain.');
         }
 
         $loket->update([
@@ -293,16 +299,16 @@ class AdminController extends Controller
             'nomor_loket' => $request->nomor_loket,
         ]);
 
-        return back()->with(
-            'success',
-            'Loket berhasil diperbarui!'
-        );
+        return back()->with('success', 'Loket berhasil diperbarui!');
     }
+
     public function destroyLoket($id)
     {
-        $loket = \App\Models\Loket::findOrFail($id);
-        \App\Models\User::where('assigned_loket_id', $loket->id)
-                        ->update(['assigned_loket_id' => null]);
+        $loket = Loket::findOrFail($id);
+        
+        // Lepas petugas dari loket ini
+        User::where('assigned_loket_id', $loket->id)
+            ->update(['assigned_loket_id' => null]);
 
         $loket->delete();
 
@@ -310,66 +316,103 @@ class AdminController extends Controller
     }
 
     // CRUD PETUGAS
-        public function storePetugas(Request $request)
-        {
-        // 1. Validasi murni untuk pembuatan akun saja
+    public function storePetugas(Request $request)
+    {
         $request->validate([
             'gerai_id' => 'required|exists:gerai,id',
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
         ]);
 
-        // 2. Buat akun petugas (tanpa penugasan gerai/loket dulu)
-        \App\Models\User::create([
+        User::create([
             'gerai_id' => $request->gerai_id,
-            'name' => $request->name,
-            'email' => $request->email,
+            'name'     => $request->name,
+            'email'    => $request->email,
             'password' => Hash::make($request->password),
-            'role' => 'PETUGAS', // Tetap pakai sistem role dari kodemu
+            'role'     => 'PETUGAS',
         ]);
 
         return redirect()->back()->with('success', 'Akun petugas baru berhasil ditambahkan!');
     }
 
-public function updatePetugas(Request $request, $id)
-{
-    $request->validate([
-        'active_petugas_id' => 'nullable|exists:users,id',
-    ]);
+    // PENUGASAN PETUGAS KE LOKET (SINKRONISASI 2 ARAH)
+    public function updatePetugas(Request $request, $id)
+    {
+        $request->validate([
+            'active_petugas_id' => 'nullable|exists:users,id',
+        ]);
 
-    // Cek apakah petugas sudah dipakai di loket lain (kecuali loket ini sendiri)
-    if ($request->filled('active_petugas_id')) {
-        $sudahDipakai = Loket::where('active_petugas_id', $request->active_petugas_id)
-                             ->where('id', '!=', $id)
-                             ->exists();
-        if ($sudahDipakai) {
-            return redirect()->back()->with('error', 'Petugas tersebut sudah bertugas di loket lain!');
+        $loket = Loket::findOrFail($id);
+        $newPetugasId = $request->active_petugas_id;
+        $oldPetugasId = $loket->active_petugas_id;
+
+        // Jika memilih petugas yang sama, tidak perlu diproses
+        if ($newPetugasId == $oldPetugasId) {
+            return redirect()->back();
         }
+
+        if ($newPetugasId) {
+            // Cek apakah petugas sudah ditugaskan di LOKET LAIN
+            $sudahDipakai = Loket::where('active_petugas_id', $newPetugasId)
+                                ->where('id', '!=', $id)
+                                ->exists();
+
+            if ($sudahDipakai) {
+                return redirect()->back()->with('error', 'Petugas tersebut sudah bertugas di loket lain!');
+            }
+        }
+
+        DB::transaction(function () use ($loket, $newPetugasId, $oldPetugasId) {
+            
+            // 1. Lepaskan petugas LAMA dari loket ini (jika ada)
+            if ($oldPetugasId) {
+                User::where('id', $oldPetugasId)->update([
+                    'assigned_loket_id' => null,
+                ]);
+            }
+
+            // 2. Jika PETUGAS BARU sebelumnya punya loket lain, kosongkan loket lamanya terlebih dahulu
+            if ($newPetugasId) {
+                Loket::where('active_petugas_id', $newPetugasId)
+                    ->where('id', '!=', $loket->id)
+                    ->update([
+                        'active_petugas_id' => null,
+                        'status' => 'INACTIVE',
+                    ]);
+            }
+
+            // 3. Update data Loket saat ini
+            $loket->update([
+                'active_petugas_id' => $newPetugasId,
+            ]);
+
+            // 4. Hubungkan Petugas baru ke Loket & Gerai ini
+            if ($newPetugasId) {
+                User::where('id', $newPetugasId)->update([
+                    'gerai_id'          => $loket->gerai_id,
+                    'assigned_loket_id' => $loket->id,
+                ]);
+            }
+        });
+
+        return redirect()->back()->with('success', 'Penugasan petugas pada loket berhasil diperbarui!');
     }
-
-    $loket = Loket::findOrFail($id);
-    $loket->update([
-        'active_petugas_id' => $request->active_petugas_id,
-    ]);
-
-    return redirect()->back()->with('success', 'Petugas pada loket berhasil diperbarui!');
-}
 
     public function destroyPetugas($id)
     {
         $user = User::where('role', 'PETUGAS')->findOrFail($id);
 
         Loket::where('active_petugas_id', $user->id)->update([
-            'status' => 'INACTIVE',
+            'status'            => 'INACTIVE',
             'active_petugas_id' => null
         ]);
         
-        // Hapus akun petugas
         $user->delete();
 
         return redirect()->back()->with('success', 'Akun petugas berhasil dihapus.');
     }
+
     // TOGGLE PETUGAS
     public function togglePetugas($id)
     {
@@ -384,84 +427,36 @@ public function updatePetugas(Request $request, $id)
             ->first();
 
         if (!$sesi) {
-            return back()->with(
-                'error',
-                'Sesi hari ini belum dibuka. Petugas tidak dapat diaktifkan.'
-            );
+            return back()->with('error', 'Sesi hari ini belum dibuka. Petugas tidak dapat diaktifkan.');
         }
 
         if (!$petugas->assigned_loket_id) {
-            return back()->with(
-                'error',
-                'Petugas belum memiliki loket.'
-            );
+            return back()->with('error', 'Petugas belum memiliki loket.');
         }
 
-        $loket = Loket::find(
-            $petugas->assigned_loket_id
-        );
+        $loket = Loket::find($petugas->assigned_loket_id);
 
         if (!$loket) {
-            return back()->with(
-                'error',
-                'Loket yang ditugaskan kepada petugas tidak ditemukan.'
-            );
+            return back()->with('error', 'Loket yang ditugaskan kepada petugas tidak ditemukan.');
         }
 
-        if (
-            (int) $loket->gerai_id !==
-            (int) $petugas->assigned_gerai_id
-        ) {
-            return back()->with(
-                'error',
-                'Penugasan gerai dan loket petugas tidak sesuai.'
-            );
+        // Aktifkan / Nonaktifkan
+        if ($loket->status === 'ACTIVE' && (int) $loket->active_petugas_id === (int) $petugas->id) {
+            $loket->update(['status' => 'INACTIVE']);
+            return back()->with('success', 'Petugas berhasil dinonaktifkan.');
         }
 
-        // Jika sedang ACTIVE oleh petugas ini
-        if (
-            $loket->status === 'ACTIVE' &&
-            (int) $loket->active_petugas_id ===
-            (int) $petugas->id
-        ) {
-            $loket->update([
-                'status' => 'INACTIVE',
-            ]);
-
-            return back()->with(
-                'success',
-                'Petugas berhasil dinonaktifkan.'
-            );
+        if ($loket->status === 'ACTIVE' && $loket->active_petugas_id) {
+            $petugasLain = User::find($loket->active_petugas_id);
+            $namaPetugas = $petugasLain ? $petugasLain->name : 'petugas lain';
+            return back()->with('error', "Loket tersebut sedang digunakan oleh {$namaPetugas}.");
         }
 
-        // Jika digunakan petugas lain
-        if (
-            $loket->status === 'ACTIVE' &&
-            $loket->active_petugas_id
-        ) {
-            $petugasLain = User::find(
-                $loket->active_petugas_id
-            );
-
-            $namaPetugas = $petugasLain
-                ? $petugasLain->name
-                : 'petugas lain';
-
-            return back()->with(
-                'error',
-                "Loket tersebut sedang digunakan oleh {$namaPetugas}."
-            );
-        }
-
-        // Aktifkan
         $loket->update([
-            'status' => 'ACTIVE',
+            'status'            => 'ACTIVE',
             'active_petugas_id' => $petugas->id,
         ]);
 
-        return back()->with(
-            'success',
-            "Petugas {$petugas->name} berhasil diaktifkan."
-        );
+        return back()->with('success', "Petugas {$petugas->name} berhasil diaktifkan.");
     }
 }
