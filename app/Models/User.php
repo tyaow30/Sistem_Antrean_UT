@@ -25,6 +25,7 @@ class User extends Authenticatable
         'password',
         'active_session_id',
         'role',
+        'gerai_id',
         'assigned_gerai_id',
         'assigned_loket_id',
     ];
@@ -77,5 +78,10 @@ class User extends Authenticatable
     public function gerai()
     {
         return $this->assignedGerai();
+    }
+
+    public function geraiPemilik()
+    {
+        return $this->belongsTo(Gerai::class, 'gerai_id');
     }
 }

@@ -5,748 +5,173 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Administrator</title>
-
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
 
-<body class="bg-gray-100 p-6">
+<body class="bg-slate-50 text-slate-800 antialiased p-4 sm:p-6 lg:p-8">
 
-    <div class="max-w-6xl mx-auto space-y-6">
+    <div class="max-w-7xl mx-auto space-y-8">
 
-        {{-- ========================================================= --}}
         {{-- HEADER --}}
-        {{-- ========================================================= --}}
-        <div class="flex justify-between items-center bg-white p-6 rounded-2xl shadow">
-
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-100 gap-4">
             <div>
-                <h1 class="text-2xl font-bold text-gray-800">
-                    Panel Administrator
+                <span class="inline-block bg-blue-50 text-blue-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-2">
+                    Admin Control Panel
+                </span>
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                    Dashboard Administrator
                 </h1>
-
-                <p class="text-sm text-gray-500">
-                    Kelola operasional dan rekapitulasi antrean
+                <p class="text-sm text-slate-500 mt-1">
+                    Kelola gerai, loket, dan rekapitulasi antrean secara terstruktur.
                 </p>
             </div>
 
             {{-- Tombol Buka / Tutup Sesi --}}
-            <form action="{{ route('admin.toggle-sesi') }}" method="POST">
+            <form action="{{ route('admin.toggle-sesi') }}" method="POST" class="w-full sm:w-auto">
                 @csrf
-
                 @if(isset($sesi) && $sesi->is_open)
-
-                    <button
-                        type="submit"
-                        class="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl shadow transition"
-                    >
+                    <button type="submit" class="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white font-semibold px-6 py-3.5 rounded-2xl shadow-lg shadow-rose-600/20 transition-all duration-200 flex items-center justify-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
                         TUTUP SESI HARI INI
                     </button>
-
                 @else
-
-                    <button
-                        type="submit"
-                        class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl shadow transition"
-                    >
+                    <button type="submit" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-3.5 rounded-2xl shadow-lg shadow-emerald-600/20 transition-all duration-200 flex items-center justify-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-white"></span>
                         BUKA SESI HARI INI
                     </button>
-
                 @endif
             </form>
-
         </div>
 
-
-        {{-- ========================================================= --}}
         {{-- NOTIFICATION --}}
-        {{-- ========================================================= --}}
-
         @if(session('success'))
-            <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl">
-                {{ session('success') }}
+            <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-5 py-4 rounded-2xl flex items-center gap-3 shadow-sm">
+                <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                <span class="text-sm font-medium">{{ session('success') }}</span>
             </div>
         @endif
 
         @if(session('error'))
-            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl">
-                {{ session('error') }}
+            <div class="bg-rose-50 border border-rose-200 text-rose-800 px-5 py-4 rounded-2xl flex items-center gap-3 shadow-sm">
+                <svg class="w-5 h-5 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                <span class="text-sm font-medium">{{ session('error') }}</span>
             </div>
         @endif
 
-
-        {{-- ========================================================= --}}
         {{-- STATISTIK --}}
-        {{-- ========================================================= --}}
-
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-blue-500">
-                <p class="text-xs text-gray-400 font-bold uppercase">
-                    Total Tiket
-                </p>
-
-                <p class="text-3xl font-black text-gray-800 mt-1">
-                    {{ $totalTiket ?? 0 }}
-                </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1.5 h-full bg-blue-500"></div>
+                <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Total Tiket</p>
+                <p class="text-3xl font-extrabold text-slate-800 mt-2">{{ $totalTiket ?? 0 }}</p>
             </div>
-
-
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-amber-500">
-                <p class="text-xs text-gray-400 font-bold uppercase">
-                    Menunggu
-                </p>
-
-                <p class="text-3xl font-black text-amber-600 mt-1">
-                    {{ $menunggu ?? 0 }}
-                </p>
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1.5 h-full bg-amber-500"></div>
+                <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Menunggu</p>
+                <p class="text-3xl font-extrabold text-amber-600 mt-2">{{ $menunggu ?? 0 }}</p>
             </div>
-
-
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-emerald-500">
-                <p class="text-xs text-gray-400 font-bold uppercase">
-                    Selesai Dilayani
-                </p>
-
-                <p class="text-3xl font-black text-emerald-600 mt-1">
-                    {{ $selesai ?? 0 }}
-                </p>
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1.5 h-full bg-emerald-500"></div>
+                <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Selesai Dilayani</p>
+                <p class="text-3xl font-extrabold text-emerald-600 mt-2">{{ $selesai ?? 0 }}</p>
             </div>
-
-
-            <div class="bg-white p-5 rounded-xl shadow border-l-4 border-rose-500">
-                <p class="text-xs text-gray-400 font-bold uppercase">
-                    Dilewati / Batal
-                </p>
-
-                <p class="text-3xl font-black text-rose-600 mt-1">
-                    {{ $dilewati ?? 0 }}
-                </p>
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1.5 h-full bg-rose-500"></div>
+                <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Dilewati / Batal</p>
+                <p class="text-3xl font-extrabold text-rose-600 mt-2">{{ $dilewati ?? 0 }}</p>
             </div>
-
         </div>
 
-
-        {{-- ========================================================= --}}
-        {{-- MASTER DATA GERAI & LOKET --}}
-        {{-- ========================================================= --}}
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-            {{-- ===================================================== --}}
-            {{-- TAMBAH GERAI --}}
-            {{-- ===================================================== --}}
-
-            <div class="bg-white p-6 rounded-xl shadow-sm">
-
-                <h3 class="text-lg font-bold mb-4 text-gray-800">
+        {{-- SECTION KELOLA GERAI (TAMBAH & LIST GRID) --}}
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            {{-- Form Tambah Gerai (Kiri) --}}
+            <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-100 h-fit">
+                <h3 class="text-lg font-bold mb-4 text-slate-900 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                     Tambah Gerai Baru
                 </h3>
-
-                <form
-                    action="{{ route('admin.gerai.store') }}"
-                    method="POST"
-                    class="flex gap-3"
-                >
-
+                <form action="{{ route('admin.gerai.store') }}" method="POST" class="space-y-4">
                     @csrf
-
-                    <input
-                        type="text"
-                        name="nama_gerai"
-                        placeholder="Nama Gerai (misal: Gerai Utama)"
-                        class="border border-gray-300 rounded-lg p-2.5 flex-1 focus:ring-2 focus:ring-blue-500 outline-none"
-                        required
-                    >
-
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">Nama Gerai</label>
+                        <input
+                            type="text"
+                            name="nama_gerai"
+                            placeholder="Contoh: Gerai Layanan Utama"
+                            class="w-full border border-slate-200 bg-slate-50/50 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-sm transition"
+                            required
+                        >
+                    </div>
                     <button
                         type="submit"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold transition"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-semibold text-sm transition shadow-md shadow-blue-600/20"
                     >
-                        Simpan
+                        Simpan Gerai
                     </button>
-
                 </form>
-
             </div>
 
+            {{-- Daftar Gerai dalam Bentuk Grid Card (Kanan - Menghemat Tempat) --}}
+            <div class="lg:col-span-2 bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-100">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">Daftar Gerai Aktif</h3>
+                        <p class="text-sm text-slate-500">Klik pada gerai untuk mengelola loket dan petugas di dalamnya.</p>
+                    </div>
+                    <span class="text-xs font-bold bg-blue-50 text-blue-600 px-3 py-1 rounded-full">
+                        {{ $geraiList->count() }} Gerai
+                    </span>
+                </div>
 
-            {{-- ===================================================== --}}
-            {{-- DAFTAR GERAI --}}
-            {{-- ===================================================== --}}
-
-            <div class="bg-white p-6 rounded-xl shadow-sm">
-
-                <h3 class="text-lg font-bold mb-4 text-gray-800">
-                    Daftar Gerai
-                </h3>
-
-                <div class="space-y-3">
-
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     @forelse($geraiList as $g)
-
-                        <div class="flex items-center justify-between border rounded-lg p-4">
-
+                        <div class="border border-slate-100 bg-slate-50/60 hover:bg-white hover:border-blue-200 hover:shadow-md transition-all rounded-2xl p-5 flex flex-col justify-between group">
                             <div>
-
-                                <p class="font-semibold text-gray-800">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs font-bold px-2.5 py-0.5 rounded-full {{ $g->is_active ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600' }}">
+                                        {{ $g->is_active ? 'Aktif' : 'Nonaktif' }}
+                                    </span>
+                                    <span class="text-xs text-slate-400 font-medium">
+                                        {{ $g->loket->count() }} Loket
+                                    </span>
+                                </div>
+                                <h4 class="font-bold text-slate-800 text-base group-hover:text-blue-600 transition">
                                     {{ $g->nama_gerai }}
-                                </p>
-
-                                <p class="text-sm text-gray-500">
-                                    {{ $g->loket->count() }} Loket
-                                </p>
-
-                                @if($g->is_active)
-                                    <span class="text-xs text-green-600 font-semibold">
-                                        ● Aktif
-                                    </span>
-                                @else
-                                    <span class="text-xs text-red-500 font-semibold">
-                                        ● Nonaktif
-                                    </span>
-                                @endif
-
+                                </h4>
                             </div>
 
+                            <div class="mt-5 pt-4 border-t border-slate-200/60 flex items-center justify-between gap-2">
+                                {{-- Tombol Masuk ke Halaman Detail Gerai (Route showGeraiDetail kamu) --}}
+                                <a href="{{ route('admin.gerai.detail', $g->id) }}" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-center py-2 px-3 rounded-xl text-xs font-semibold transition">
+                                    Kelola Loket & Petugas &rarr;
+                                </a>
 
-                            <div class="flex gap-2">
-
-                                {{-- EDIT GERAI --}}
-                                <form
-                                    action="{{ route('admin.gerai.update', $g->id) }}"
-                                    method="POST"
-                                    class="flex gap-2"
-                                >
-
+                                {{-- Aksi Cepat Edit Nama / Hapus Gerai --}}
+                                <form action="{{ route('admin.gerai.destroy', $g->id) }}" method="POST" onsubmit="return confirm('Hapus gerai {{ $g->nama_gerai }}?');">
                                     @csrf
-                                    @method('PUT')
-
-                                    <input
-                                        type="text"
-                                        name="nama_gerai"
-                                        value="{{ $g->nama_gerai }}"
-                                        class="border border-gray-300 rounded-lg px-3 py-2"
-                                        required
-                                    >
-
-                                    <button
-                                        type="submit"
-                                        class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-semibold"
-                                    >
-                                        Edit
+                                    @method('DELETE')
+                                    <button type="submit" class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition" title="Hapus Gerai">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                     </button>
-
                                 </form>
-
-
-                                {{-- AKTIF / NONAKTIF GERAI --}}
-                                <form
-                                    action="{{ route('admin.gerai.toggle', $g->id) }}"
-                                    method="POST"
-                                >
-
-                                    @csrf
-                                    @method('PATCH')
-
-                                    <button
-                                        type="submit"
-                                        class="{{ $g->is_active
-                                            ? 'bg-red-500 hover:bg-red-600'
-                                            : 'bg-green-500 hover:bg-green-600'
-                                        }} text-white px-4 py-2 rounded-lg font-semibold"
-                                    >
-
-                                        {{ $g->is_active ? 'Nonaktifkan' : 'Aktifkan' }}
-
-                                    </button>
-
-                                </form>
-
                             </div>
-
                         </div>
-
                     @empty
-
-                        <p class="text-gray-400 text-center py-4">
-                            Belum ada gerai.
-                        </p>
-
-                    @endforelse
-
-                </div>
-
-            </div>
-
-
-            {{-- ===================================================== --}}
-            {{-- TAMBAH LOKET --}}
-            {{-- ===================================================== --}}
-
-            <div class="bg-white p-6 rounded-xl shadow-sm">
-
-                <h3 class="text-lg font-bold mb-4 text-gray-800">
-                    Tambah Loket Baru
-                </h3>
-
-                <form
-                    action="{{ route('admin.loket.store') }}"
-                    method="POST"
-                    class="flex gap-3"
-                >
-
-                    @csrf
-
-                    <select
-                        name="gerai_id"
-                        class="border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-green-500 outline-none"
-                        required
-                    >
-
-                        <option value="">
-                            -- Pilih Gerai --
-                        </option>
-
-                        @foreach($geraiList as $g)
-
-                            <option value="{{ $g->id }}">
-                                {{ $g->nama_gerai }}
-                            </option>
-
-                        @endforeach
-
-                    </select>
-
-
-                    <input
-                        type="number"
-                        name="nomor_loket"
-                        placeholder="Nomor Loket"
-                        class="border border-gray-300 rounded-lg p-2.5 flex-1 focus:ring-2 focus:ring-green-500 outline-none"
-                        required
-                        min="1"
-                    >
-
-
-                    <button
-                        type="submit"
-                        class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg font-semibold transition"
-                    >
-                        Simpan
-                    </button>
-
-                </form>
-
-            </div>
-
-        </div>
-
-
-        {{-- ========================================================= --}}
-        {{-- DAFTAR LOKET --}}
-        {{-- ========================================================= --}}
-
-        <div class="bg-white p-6 rounded-xl shadow-sm">
-
-            <h3 class="text-lg font-bold mb-4 text-gray-800">
-                Daftar Loket
-            </h3>
-
-            <div class="space-y-3">
-
-                @forelse($geraiList as $g)
-
-                    @foreach($g->loket as $l)
-
-                        <div class="flex items-center justify-between border rounded-lg p-4">
-
-                            <div>
-
-                                <p class="font-semibold text-gray-800">
-                                    {{ $g->nama_gerai }}
-                                    - Loket {{ $l->nomor_loket }}
-                                </p>
-
-                                <p class="text-sm text-gray-500">
-                                    Status: {{ $l->status }}
-                                </p>
-
-                                @if($l->active_petugas_id)
-                                    <p class="text-xs text-blue-600 mt-1">
-                                        Sedang digunakan petugas
-                                    </p>
-                                @endif
-
-                            </div>
-
-
-                            {{-- EDIT LOKET --}}
-                            <form
-                                action="{{ route('admin.loket.update', $l->id) }}"
-                                method="POST"
-                                class="flex gap-2"
-                            >
-
-                                @csrf
-                                @method('PUT')
-
-                                <input
-                                    type="hidden"
-                                    name="gerai_id"
-                                    value="{{ $l->gerai_id }}"
-                                >
-
-                                <input
-                                    type="number"
-                                    name="nomor_loket"
-                                    value="{{ $l->nomor_loket }}"
-                                    min="1"
-                                    required
-                                    class="border border-gray-300 rounded-lg px-3 py-2 w-28"
-                                >
-
-                                <button
-                                    type="submit"
-                                    class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-semibold"
-                                >
-                                    Edit
-                                </button>
-
-                            </form>
-
+                        <div class="col-span-2 text-center py-8 text-slate-400 text-sm">
+                            Belum ada gerai yang ditambahkan.
                         </div>
-
-                    @endforeach
-
-                @empty
-
-                    <p class="text-gray-400 text-center py-4">
-                        Belum ada loket.
-                    </p>
-
-                @endforelse
-
-            </div>
-
-        </div>
-
-
-        {{-- ========================================================= --}}
-        {{-- TAMBAH PETUGAS --}}
-        {{-- ========================================================= --}}
-
-        <div class="bg-white p-6 rounded-xl shadow-sm">
-
-            <h3 class="text-lg font-bold mb-4 text-gray-800">
-                Tambah & Penugasan Petugas
-            </h3>
-
-            <form
-                action="{{ route('admin.petugas.store') }}"
-                method="POST"
-                class="grid grid-cols-1 md:grid-cols-3 gap-4"
-            >
-
-                @csrf
-
-                <input
-                    type="text"
-                    name="name"
-                    placeholder="Nama Lengkap"
-                    class="border border-gray-300 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-                    required
-                >
-
-                <input
-                    type="email"
-                    name="email"
-                    placeholder="Email Petugas"
-                    class="border border-gray-300 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-                    required
-                >
-
-                <input
-                    type="password"
-                    name="password"
-                    placeholder="Password Min. 6 Karakter"
-                    class="border border-gray-300 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-                    required
-                >
-
-
-                <select
-                    name="assigned_gerai_id"
-                    class="border border-gray-300 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-                    required
-                >
-
-                    <option value="">
-                        -- Tugaskan ke Gerai --
-                    </option>
-
-                    @foreach($geraiList as $g)
-
-                        <option value="{{ $g->id }}">
-                            {{ $g->nama_gerai }}
-                        </option>
-
-                    @endforeach
-
-                </select>
-
-
-                <select
-                    name="assigned_loket_id"
-                    class="border border-gray-300 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-                    required
-                >
-
-                    <option value="">
-                        -- Tugaskan ke Loket --
-                    </option>
-
-                    @foreach($geraiList as $g)
-
-                        @foreach($g->loket as $l)
-
-                            <option value="{{ $l->id }}">
-                                {{ $g->nama_gerai }}
-                                - Loket {{ $l->nomor_loket }}
-                            </option>
-
-                        @endforeach
-
-                    @endforeach
-
-                </select>
-
-
-                <button
-                    type="submit"
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-2.5 rounded-lg transition"
-                >
-                    Simpan Petugas
-                </button>
-
-            </form>
-
-        </div>
-
-
-        {{-- ========================================================= --}}
-        {{-- TABEL PETUGAS --}}
-        {{-- ========================================================= --}}
-
-        <div class="bg-white p-6 rounded-xl shadow-sm">
-
-            <div class="flex items-center justify-between mb-4">
-
-                <div>
-
-                    <h3 class="text-lg font-bold text-gray-800">
-                        Daftar Petugas Terdaftar
-                    </h3>
-
-                    <p class="text-sm text-gray-500 mt-1">
-                        Kelola status aktif petugas pada loket masing-masing.
-                    </p>
-
+                    @endforelse
                 </div>
-
-            </div>
-
-
-            <div class="overflow-x-auto">
-
-                <table class="w-full text-left border-collapse">
-
-                    <thead>
-
-                        <tr class="border-b bg-gray-50 text-sm text-gray-600">
-
-                            <th class="p-3">
-                                Nama Petugas
-                            </th>
-
-                            <th class="p-3">
-                                Email
-                            </th>
-
-                            <th class="p-3">
-                                Penugasan Gerai
-                            </th>
-
-                            <th class="p-3">
-                                Penugasan Loket
-                            </th>
-
-                            <th class="p-3">
-                                Status
-                            </th>
-
-                            <th class="p-3 text-center">
-                                Aksi
-                            </th>
-
-                        </tr>
-
-                    </thead>
-
-
-                    <tbody class="divide-y divide-gray-100">
-
-                        @forelse($petugasList as $p)
-
-                            @php
-
-                                $loketPetugas = $p->assignedLoket;
-
-                                $isActive =
-                                    $loketPetugas &&
-                                    $loketPetugas->status === 'ACTIVE' &&
-                                    (int) $loketPetugas->active_petugas_id === (int) $p->id;
-
-                            @endphp
-
-
-                            <tr class="hover:bg-gray-50 text-sm">
-
-                                {{-- NAMA --}}
-                                <td class="p-3 font-semibold text-gray-800">
-
-                                    {{ $p->name }}
-
-                                </td>
-
-
-                                {{-- EMAIL --}}
-                                <td class="p-3 text-gray-600">
-
-                                    {{ $p->email }}
-
-                                </td>
-
-
-                                {{-- GERAI --}}
-                                <td class="p-3 text-gray-700">
-
-                                    {{ $p->assignedGerai->nama_gerai ?? '-' }}
-
-                                </td>
-
-
-                                {{-- LOKET --}}
-                                <td class="p-3 text-gray-700">
-
-                                    @if($p->assignedLoket)
-
-                                        Loket {{ $p->assignedLoket->nomor_loket }}
-
-                                    @else
-
-                                        -
-
-                                    @endif
-
-                                </td>
-
-
-                                {{-- STATUS --}}
-                                <td class="p-3">
-
-                                    @if($isActive)
-
-                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
-
-                                            ● ACTIVE
-
-                                        </span>
-
-                                    @else
-
-                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600">
-
-                                            ● INACTIVE
-
-                                        </span>
-
-                                    @endif
-
-                                </td>
-
-
-                                {{-- AKSI --}}
-                                <td class="p-3 text-center">
-
-                                    @if($p->assignedLoket)
-
-                                        <form
-                                            action="{{ route('admin.petugas.toggle', $p->id) }}"
-                                            method="POST"
-                                        >
-
-                                            @csrf
-                                            @method('PATCH')
-
-
-                                            @if($isActive)
-
-                                                <button
-                                                    type="submit"
-                                                    class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold transition"
-                                                >
-                                                    Nonaktifkan
-                                                </button>
-
-                                            @else
-
-                                                <button
-                                                    type="submit"
-                                                    class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition"
-                                                >
-                                                    Aktifkan
-                                                </button>
-
-                                            @endif
-
-                                        </form>
-
-                                    @else
-
-                                        <span class="text-gray-400 text-xs">
-                                            Belum ada loket
-                                        </span>
-
-                                    @endif
-
-                                </td>
-
-                            </tr>
-
-                        @empty
-
-                            <tr>
-
-                                <td
-                                    colspan="6"
-                                    class="p-4 text-center text-gray-400"
-                                >
-                                    Belum ada data petugas terdaftar.
-                                </td>
-
-                            </tr>
-
-                        @endforelse
-
-                    </tbody>
-
-                </table>
-
             </div>
 
         </div>
 
     </div>
-
 </body>
-
 </html>
