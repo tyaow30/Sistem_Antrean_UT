@@ -2,68 +2,123 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Display Antrean - {{ $gerai->nama_gerai }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
     @vite(['resources/js/app.js'])
-</head>
-<body class="bg-slate-900 text-white min-h-screen flex flex-col justify-between p-8">
-    
-    <!-- Header -->
-    <header class="flex justify-between items-center border-b border-slate-700 pb-4">
-        <h1 class="text-3xl font-extrabold tracking-wide text-blue-400">{{ $gerai->nama_gerai }}</h1>
-        <div id="clock" class="text-2xl font-mono text-slate-400">00:00:00</div>
-    </header>
-
-    <!-- Main Display Section -->
-    <main class="grid grid-cols-1 lg:grid-cols-3 gap-8 my-auto py-6">
-        
-        <!-- Panggilan Utama (Besar) -->
-        <section class="lg:col-span-2 bg-slate-800 border-2 border-blue-500 rounded-3xl p-10 flex flex-col items-center justify-center shadow-2xl text-center">
-            <span class="text-xl uppercase font-bold tracking-widest text-slate-400 mb-2">Nomor Dipanggil</span>
-            <div id="nomor-aktif" class="text-8xl lg:text-9xl font-black text-amber-400 my-4">---</div>
-            <div id="loket-aktif" class="text-3xl font-bold text-blue-300">Menunggu Panggilan...</div>
-        </section>
-
-        <!-- Riwayat Panggilan -->
-        <section class="bg-slate-800 rounded-3xl p-6 border border-slate-700 flex flex-col">
-            <h2 class="text-lg font-bold text-slate-300 border-b border-slate-700 pb-3 mb-4">Panggilan Terakhir</h2>
-            <div id="daftar-riwayat" class="space-y-3 flex-1 overflow-y-auto">
-                <p class="text-slate-500 text-center py-4">Belum ada riwayat</p>
-            </div>
-        </section>
-    </main>
-
-    <!-- Footer Status -->
-    <footer class="bg-slate-800 rounded-xl p-4 text-center text-xs text-slate-500">
-        Klik layar sekali untuk mengaktifkan Suara Pemanggilan (TTS)
-    </footer>
 
     <script>
-        let isAudioAllowed = false;
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            yellow: '#FFDC5F',
+                            darkblue: '#0A4595',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-white text-slate-900 min-h-screen flex flex-col justify-between p-6 lg:p-10 font-sans antialiased">
 
-        // Izinkan audio diputar setelah ada interaksi pengguna (kebijakan browser)
+    <!-- HEADER / TOP BAR -->
+    <header class="flex justify-between items-center mb-6">
+        <div class="flex items-center">
+            <img src="{{ asset('images/logo-UT-2.png') }}" alt="Universitas Terbuka" class="h-16 w-auto object-contain">
+        </div>
+        <div id="clock" class="text-3xl lg:text-4xl font-light tracking-widest text-slate-800">
+            00 . 00 . 00
+        </div>
+    </header>
+
+    <!-- MAIN DISPLAY CONTENT -->
+    <main class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch my-auto">
+        
+        <!-- UTAMA: NOMOR DIPANGGIL -->
+        <section class="lg:col-span-8 bg-brand-darkblue rounded-3xl p-8 lg:p-12 flex flex-col justify-between text-white shadow-xl min-h-[480px]">
+            <div>
+                <span class="text-2xl lg:text-3xl font-medium tracking-wide text-white/90">
+                    Nomor Dipanggil :
+                </span>
+            </div>
+
+            <div class="my-auto text-center py-6">
+                <div id="nomor-aktif" class="text-6xl sm:text-7xl lg:text-8xl xl:text-[9.5rem] font-black text-brand-yellow tracking-tight leading-none">
+                    ---
+                </div>
+            </div>
+
+            <div class="text-center">
+                <p class="text-xl lg:text-2xl font-normal text-white/90 mb-1">
+                    Silakan menuju ke
+                </p>
+                <p id="loket-aktif" class="text-2xl lg:text-4xl font-extrabold text-brand-yellow uppercase tracking-wider">
+                    {{ strtoupper($gerai->nama_gerai) }} - MENUNGGU PANGGILAN
+                </p>
+            </div>
+        </section>
+
+        <!-- PANGGILAN TERAKHIR -->
+        <section class="lg:col-span-4 bg-brand-yellow rounded-3xl p-6 flex flex-col justify-start shadow-md">
+            <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b-2 border-slate-900/20">
+                Panggilan Terakhir
+            </h2>
+
+            <div id="daftar-riwayat" class="space-y-3 overflow-y-auto max-h-[460px] pr-1 flex-1">
+                <p class="text-slate-700 text-center py-6 font-medium">Belum ada riwayat</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER COPYRIGHT & AUDIO NOTIFICATION -->
+    <footer class="mt-6 text-center space-y-1">
+        <p class="text-sm font-medium text-slate-500">
+            © 2026 Universitas Terbuka. All rights reserved.
+        </p>
+    </footer>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        let isAudioAllowed = false;
+        const namaGerai = "{{ strtoupper($gerai->nama_gerai) }}";
+
+        // Izinkan audio diputar setelah ada interaksi pengguna
         document.body.addEventListener('click', () => {
             isAudioAllowed = true;
         }, { once: true });
 
-        // Jam Digital
-        setInterval(() => {
-            document.getElementById('clock').innerText = new Date().toLocaleTimeString('id-ID');
-        }, 1000);
+        // Jam Digital dengan format titik (09 . 09 . 15)
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('clock').innerText = `${hours} . ${minutes} . ${seconds}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
 
-        // Fungsi Bicara Text-to-Speech (Indonesian)
+        // Suara Text-to-Speech
         function speak(text) {
             if (!isAudioAllowed || !('speechSynthesis' in window)) return;
 
-            window.speechSynthesis.cancel(); // Hentikan suara sebelumnya jika ada
+            window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'id-ID';
-            utterance.rate = 0.85; // Kecepatan bicara
+            utterance.rate = 0.85;
             window.speechSynthesis.speak(utterance);
         }
 
-        // 1. Fetch Data Awal saat Layar Pertama Dimuat
+        // Fetch Data Initial Display
         async function fetchInitialData() {
             try {
                 const response = await fetch("{{ route('api.display.latest', $gerai->id) }}");
@@ -73,7 +128,7 @@
                     const nomor = data.aktif.kode_antrean;
                     const loket = data.aktif.loket_melayani ? data.aktif.loket_melayani.nomor_loket : '-';
                     document.getElementById('nomor-aktif').innerText = nomor;
-                    document.getElementById('loket-aktif').innerText = `SILAKAN KE LOKET ${loket}`;
+                    document.getElementById('loket-aktif').innerText = `${namaGerai} - LOKET ${loket}`;
                 }
 
                 updateRiwayatUI(data.riwayat);
@@ -82,23 +137,23 @@
             }
         }
 
-        // Fungsi Helper Update Riwayat
+        // Render Riwayat UI (Struktur Card Biru Tua)
         function updateRiwayatUI(riwayat) {
             if (riwayat && riwayat.length > 0) {
                 const listHtml = riwayat.map(item => `
-                    <div class="flex justify-between items-center bg-slate-700/50 p-3 rounded-xl border border-slate-600">
-                        <span class="text-2xl font-black text-amber-300">${item.kode_antrean}</span>
-                        <span class="text-sm font-semibold text-slate-300">Loket ${item.loket_melayani ? item.loket_melayani.nomor_loket : '-'}</span>
+                    <div class="bg-brand-darkblue text-white text-center py-3.5 px-4 rounded-xl shadow-sm">
+                        <span class="text-2xl lg:text-3xl font-extrabold tracking-wider block">
+                            ${item.kode_antrean}
+                        </span>
                     </div>
                 `).join('');
                 document.getElementById('daftar-riwayat').innerHTML = listHtml;
             }
         }
 
-        // Jalankan Data Awal
         fetchInitialData();
 
-        // 2. Listener Realtime Laravel Reverb (WebSocket)
+        // WebSocket Event Listener (Laravel Reverb)
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof window.Echo !== 'undefined') {
                 window.Echo.channel(`display-gerai.{{ $gerai->id }}`)
@@ -107,14 +162,11 @@
                         const nomor = antrean.kode_antrean;
                         const loket = antrean.loket_melayani ? antrean.loket_melayani.nomor_loket : '-';
 
-                        // Update Layar Utama
                         document.getElementById('nomor-aktif').innerText = nomor;
-                        document.getElementById('loket-aktif').innerText = `SILAKAN KE LOKET ${loket}`;
+                        document.getElementById('loket-aktif').innerText = `${namaGerai} - LOKET ${loket}`;
 
-                        // Bunyikan Suara Pemanggilan Instant
-                        speak(`Nomor antrean ${nomor}, silahkan menuju ke loket ${loket}`);
+                        speak(`Nomor antrean ${nomor}, silakan menuju ke ${namaGerai}, loket ${loket}`);
 
-                        // Ambil ulang riwayat terbaru
                         fetchInitialData();
                     });
             }
