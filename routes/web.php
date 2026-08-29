@@ -7,61 +7,55 @@ use App\Http\Controllers\DisplayController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\KioskController;
 
-// KIOSK
-Route::get('/', [KioskController::class, 'index'])
-    ->name('kiosk.index');
-
+// =========================================================
+// KIOSK ROUTES
+// =========================================================
+Route::get('/', [KioskController::class, 'index'])->name('kiosk.index');
 Route::get('/kiosk', [KioskController::class, 'index']);
+Route::get('/kiosk/gerai/{id}', [KioskController::class, 'pilihGerai'])->name('kiosk.gerai');
 
-Route::get('/kiosk/gerai/{id}', [KioskController::class, 'pilihGerai'])
-    ->name('kiosk.gerai');
+// Mendukung GET & POST untuk cetak tiket
+Route::match(['get', 'post'], '/kiosk/cetak/{loket_id}', [KioskController::class, 'cetakTiket'])->name('kiosk.cetak');
 
-Route::get('/kiosk/loket/{id}', [KioskController::class, 'pilihLoket'])
-    ->name('kiosk.loket');
+// Konfirmasi & Batal Tiket
+Route::post('/kiosk/tiket/{id}/confirm', [KioskController::class, 'confirmCetak'])->name('kiosk.tiket.confirm');
+Route::post('/kiosk/tiket/{id}/cancel', [KioskController::class, 'cancelCetak'])->name('kiosk.tiket.cancel');
 
-// Cetak tiket
-Route::post('/kiosk/cetak/{loket_id}', [KioskController::class, 'cetakTiket'])
-    ->name('kiosk.cetak');
 
-// Konfirmasi cetak tiket
-Route::post('/kiosk/tiket/{id}/confirm', [KioskController::class, 'confirmCetak'])
-    ->name('kiosk.tiket.confirm');
-
-// Batalkan cetak tiket
-Route::post('/kiosk/tiket/{id}/cancel', [KioskController::class, 'cancelCetak'])
-    ->name('kiosk.tiket.cancel');
-
-// DASHBOARD DEFAULT
+// =========================================================
+// DASHBOARD REDIRECTOR
+// =========================================================
 Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])
-  ->name('dashboard');
+    $user = auth()->user();
+
+    if (strtoupper($user->role) === 'ADMIN') {
+        return redirect()->route('admin.dashboard');
+    }
+
+    if (strtoupper($user->role) === 'PETUGAS') {
+        return redirect()->route('petugas.dashboard');
+    }
+
+    return redirect()->route('kiosk.index');
+})->middleware(['auth', 'verified'])->name('dashboard');
 
 
-// PROFILE
+// =========================================================
+// PROFILE ROUTES
+// =========================================================
 Route::middleware('auth')->group(function () {
-
-    Route::get('/profile', [ProfileController::class, 'edit'])
-        ->name('profile.edit');
-
-    Route::patch('/profile', [ProfileController::class, 'update'])
-        ->name('profile.update');
-
-    Route::delete('/profile', [ProfileController::class, 'destroy'])
-        ->name('profile.destroy');
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
 
-// PETUGAS
-
+// =========================================================
+// PETUGAS ROUTES
+// =========================================================
 Route::middleware(['auth', 'role:PETUGAS'])->group(function () {
-
-    Route::get('/petugas/dashboard', [PetugasController::class, 'index'])
-        ->name('petugas.dashboard');
-
-    Route::post('/petugas/heartbeat', [PetugasController::class, 'heartbeat'])
-        ->name('petugas.heartbeat');
-
+    Route::get('/petugas/dashboard', [PetugasController::class, 'index'])->name('petugas.dashboard');
+    Route::post('/petugas/heartbeat', [PetugasController::class, 'heartbeat'])->name('petugas.heartbeat');
     Route::post('/petugas/panggil-next', [PetugasController::class, 'panggilBerikutnya'])->name('petugas.panggil-next');
     Route::post('/petugas/panggil-ulang/{id}', [PetugasController::class, 'panggilUlang'])->name('petugas.panggil-ulang');
     Route::post('/petugas/panggil-bantuan/{id}', [PetugasController::class, 'panggilBantuan'])->name('petugas.panggil-bantuan');
@@ -69,15 +63,12 @@ Route::middleware(['auth', 'role:PETUGAS'])->group(function () {
 });
 
 
-// ADMIN
+// =========================================================
+// ADMIN ROUTES
+// =========================================================
 Route::middleware(['auth', 'role:ADMIN'])->group(function () {
-
-    // Dashboard Admin
     Route::get('/admin/dashboard', [AdminController::class, 'index'])->name('admin.dashboard');
-    // Halaman Detail Gerai (Menampilkan Loket & Petugas di gerai tersebut)
-    Route::get('/admin/gerai/{id}', [App\Http\Controllers\AdminController::class, 'showGeraiDetail'])->name('admin.gerai.detail');
-
-    // Toggle Sesi Hari Ini
+    Route::get('/admin/gerai/{id}', [AdminController::class, 'showGeraiDetail'])->name('admin.gerai.detail');
     Route::post('/admin/toggle-sesi', [AdminController::class, 'toggleSesi'])->name('admin.toggle-sesi');
 
     // CRUD GERAI
@@ -88,21 +79,22 @@ Route::middleware(['auth', 'role:ADMIN'])->group(function () {
 
     // CRUD LOKET
     Route::post('/admin/loket', [AdminController::class, 'storeLoket'])->name('admin.loket.store');
-    Route::put('/admin/loket/{id}', [AdminController::class, 'updateLoket']) ->name('admin.loket.update');
-    Route::delete('/admin/loket/{id}', [AdminController::class, 'destroyLoket']) ->name('admin.loket.destroy');
+    Route::put('/admin/loket/{id}', [AdminController::class, 'updateLoket'])->name('admin.loket.update');
+    Route::delete('/admin/loket/{id}', [AdminController::class, 'destroyLoket'])->name('admin.loket.destroy');
 
     // CRUD PETUGAS
-    Route::post('/admin/petugas', [AdminController::class, 'storePetugas']) ->name('admin.petugas.store');
-    Route::patch('/admin/petugas/{id}/toggle', [AdminController::class, 'togglePetugas']) ->name('admin.petugas.toggle');
+    Route::post('/admin/petugas', [AdminController::class, 'storePetugas'])->name('admin.petugas.store');
+    Route::patch('/admin/petugas/{id}/toggle', [AdminController::class, 'togglePetugas'])->name('admin.petugas.toggle');
     Route::delete('/admin/petugas/{id}', [AdminController::class, 'destroyPetugas'])->name('admin.petugas.destroy');
-
-    // Di dalam file web.php (Routes)
-Route::patch('/admin/loket/{id}/update-petugas', [App\Http\Controllers\AdminController::class, 'updatePetugas'])->name('admin.loket.update-petugas');
+    Route::patch('/admin/loket/{id}/update-petugas', [AdminController::class, 'updatePetugas'])->name('admin.loket.update-petugas');
 });
 
 
-// DISPLAY
-Route::get('/display/{geraiId}', [DisplayController::class, 'show']) ->name('display.show');
+// =========================================================
+// DISPLAY ROUTES
+// =========================================================
+Route::get('/display/{geraiId}', [DisplayController::class, 'show'])->name('display.show');
 Route::get('/api/display/{geraiId}/latest', [DisplayController::class, 'getLatest'])->name('api.display.latest');
+
 // AUTH
 require __DIR__ . '/auth.php';

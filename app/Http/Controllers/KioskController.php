@@ -12,39 +12,26 @@ use Illuminate\Support\Facades\DB;
 class KioskController extends Controller
 {
     // =========================================================
-    // KIOSK
+    // KIOSK (HALAMAN UTAMA / PILIH GERAI)
     // =========================================================
-
     public function index()
     {
         $gerai = Gerai::where('is_active', true)->get();
 
-        return view(
-            'kiosk.pilih-gerai',
-            compact('gerai')
-        );
+        return view('kiosk.pilih-gerai', compact('gerai'));
     }
 
     // =========================================================
-    // PILIH GERAI
+    // PILIH GERAI (OPSI LOKET)
     // =========================================================
-
     public function pilihGerai($id)
     {
-        $gerai = Gerai::with([
-            'loket' => function ($query) {
-                $query->where('status', 'ACTIVE')
-                    ->whereNotNull('active_petugas_id');
-            }
-        ])->findOrFail($id);
+        $gerai = Gerai::findOrFail($id);
 
         if (!$gerai->is_active) {
             return redirect()
                 ->route('kiosk.index')
-                ->with(
-                    'error',
-                    'Gerai tersebut sedang tidak aktif!'
-                );
+                ->with('error', 'Gerai tersebut sedang tidak aktif!');
         }
 
         $sesi = SesiHari::where('is_open', true)
@@ -55,34 +42,39 @@ class KioskController extends Controller
         if (!$sesi) {
             return redirect()
                 ->route('kiosk.index')
-                ->with(
-                    'error',
-                    'Mohon maaf, sesi antrean saat ini sedang ditutup!'
-                );
+                ->with('error', 'Mohon maaf, sesi antrean saat ini sedang ditutup!');
         }
 
-        return view(
-            'kiosk.pilih-loket',
-            compact('gerai')
-        );
+        // PERBAIKAN: Longgarkan batas toleransi heartbeat menjadi 5 menit (atau hapus jika ingin murni berdasarkan status aktif petugas)
+        // Kalau mau lebih aman dari masalah jeda waktu, kita buat jadi 5 menit atau cek null-nya.
+        $batasAktif = now()->subMinutes(30);
+
+        // Ambil SEMUA loket aktif di gerai ini
+        $loketList = Loket::where('gerai_id', $id)
+            ->where('status', 'ACTIVE')
+            ->whereNotNull('active_petugas_id')
+            ->where(function ($query) use ($batasAktif) {
+                // Mencegah loket hilang jika heartbeat belum sempat terkirim tapi petugas sudah login
+                $query->where('last_heartbeat_at', '>=', $batasAktif)
+                      ->orWhereNull('last_heartbeat_at');
+            })
+            ->withCount(['antrean as total_antrean' => function ($query) use ($sesi) {
+                $query->where('sesi_hari_id', $sesi->id)
+                    ->whereIn('status', ['WAITING', 'CALLING', 'PRINTING']);
+            }])
+            ->get();
+
+        return view('kiosk.pilih-loket', compact('gerai', 'loketList'));
     }
 
     // =========================================================
-    // CETAK TIKET
+    // CETAK TIKET (DRAFT RECORD "PRINTING")
     // =========================================================
-
     public function cetakTiket($loket_id)
     {
         try {
             $antrean = DB::transaction(function () use ($loket_id) {
 
-                /*
-                 * LOCK SESI
-                 *
-                 * Sesi dikunci supaya dua request bersamaan
-                 * tidak bisa mengambil nomor antrean secara
-                 * bersamaan.
-                 */
                 $sesi = SesiHari::where('is_open', true)
                     ->whereDate('tanggal', today())
                     ->latest()
@@ -90,80 +82,40 @@ class KioskController extends Controller
                     ->first();
 
                 if (!$sesi) {
-                    throw new \RuntimeException(
-                        'Sesi antrean sedang ditutup!'
-                    );
+                    throw new \RuntimeException('Sesi antrean sedang ditutup!');
                 }
 
-                /*
-                 * LOCK LOKET
-                 *
-                 * Pastikan status loket masih benar ketika
-                 * transaksi berlangsung.
-                 */
                 $loket = Loket::with('gerai')
                     ->where('id', $loket_id)
                     ->lockForUpdate()
                     ->first();
 
                 if (!$loket) {
-                    throw new \RuntimeException(
-                        'Loket tidak ditemukan!'
-                    );
+                    throw new \RuntimeException('Loket tidak ditemukan!');
                 }
 
-                // Loket harus ACTIVE
                 if ($loket->status !== 'ACTIVE') {
-                    throw new \RuntimeException(
-                        'Loket tersebut sedang tidak aktif!'
-                    );
+                    throw new \RuntimeException('Loket tersebut sedang tidak aktif!');
                 }
 
-                // Harus ada petugas aktif
                 if (!$loket->active_petugas_id) {
-                    throw new \RuntimeException(
-                        'Loket belum memiliki petugas aktif!'
-                    );
+                    throw new \RuntimeException('Loket belum memiliki petugas aktif!');
                 }
 
-                // Gerai harus aktif
-                if (
-                    !$loket->gerai ||
-                    !$loket->gerai->is_active
-                ) {
-                    throw new \RuntimeException(
-                        'Gerai loket sedang tidak aktif!'
-                    );
+                if (!$loket->gerai || !$loket->gerai->is_active) {
+                    throw new \RuntimeException('Gerai loket sedang tidak aktif!');
                 }
 
-                /*
-                 * Ambil nomor terakhir.
-                 *
-                 * Karena SESI dikunci, request cetak tiket
-                 * lain akan menunggu transaksi ini selesai.
-                 */
-                $lastAntrean = Antrean::where(
-                    'sesi_hari_id',
-                    $sesi->id
-                )
-                    ->where(
-                        'loket_asal_id',
-                        $loket->id
-                    )
+                // Ambil nomor urut antrean terakhir
+                $lastAntrean = Antrean::where('sesi_hari_id', $sesi->id)
+                    ->where('loket_asal_id', $loket->id)
                     ->max('nomor_antrean');
 
                 $nomorBaru = ((int) $lastAntrean) + 1;
 
-                $kodeAntrean =
-                    'G' . $loket->gerai_id .
+                $kodeAntrean = 'G' . $loket->gerai_id .
                     '-L' . $loket->nomor_loket .
-                    '-' .
-                    str_pad(
-                        $nomorBaru,
-                        3,
-                        '0',
-                        STR_PAD_LEFT
-                    );
+                    '-' . str_pad($nomorBaru, 3, '0', STR_PAD_LEFT);
 
                 return Antrean::create([
                     'sesi_hari_id' => $sesi->id,
@@ -179,30 +131,20 @@ class KioskController extends Controller
                 ]);
             });
 
-            // Ambil ulang loket untuk view
-            $loket = Loket::with('gerai')
-                ->findOrFail($loket_id);
+            $loket = Loket::with('gerai')->findOrFail($loket_id);
 
-            return view(
-                'kiosk.cetak-tiket',
-                compact('antrean', 'loket')
-            );
+            return view('kiosk.cetak-tiket', compact('antrean', 'loket'));
 
         } catch (\RuntimeException $e) {
-
             return redirect()
                 ->route('kiosk.index')
-                ->with(
-                    'error',
-                    $e->getMessage()
-                );
+                ->with('error', $e->getMessage());
         }
     }
 
     // =========================================================
-    // KONFIRMASI CETAK
+    // KONFIRMASI CETAK (STATUS DIUBAH MENJADI WAITING)
     // =========================================================
-
     public function confirmCetak($id)
     {
         $antrean = Antrean::findOrFail($id);
@@ -210,13 +152,9 @@ class KioskController extends Controller
         if ($antrean->status !== 'PRINTING') {
             return redirect()
                 ->route('kiosk.index')
-                ->with(
-                    'error',
-                    'Tiket sudah diproses.'
-                );
+                ->with('error', 'Tiket sudah diproses.');
         }
 
-        // Pastikan tiket masih berasal dari sesi yang aktif
         $sesi = SesiHari::where('id', $antrean->sesi_hari_id)
             ->where('is_open', true)
             ->whereDate('tanggal', today())
@@ -225,54 +163,34 @@ class KioskController extends Controller
         if (!$sesi) {
             return redirect()
                 ->route('kiosk.index')
-                ->with(
-                    'error',
-                    'Sesi tiket sudah ditutup.'
-                );
+                ->with('error', 'Sesi tiket sudah ditutup.');
         }
 
         $antrean->update([
             'status' => 'WAITING',
         ]);
 
-        return redirect()
-            ->route('kiosk.index');
+        return redirect()->route('kiosk.index');
     }
 
     // =========================================================
-    // BATAL CETAK
+    // BATAL CETAK (RECORD DIHAPUS DARI DATABASE)
     // =========================================================
-
     public function cancelCetak($id)
+    : \Illuminate\Http\RedirectResponse
     {
         $antrean = Antrean::findOrFail($id);
 
         if ($antrean->status !== 'PRINTING') {
             return redirect()
                 ->route('kiosk.index')
-                ->with(
-                    'error',
-                    'Tiket sudah diproses.'
-                );
-        }
-
-        $sesi = SesiHari::where('id', $antrean->sesi_hari_id)
-            ->where('is_open', true)
-            ->whereDate('tanggal', today())
-            ->first();
-
-        if (!$sesi) {
-            return redirect()
-                ->route('kiosk.index')
-                ->with(
-                    'error',
-                    'Sesi tiket sudah ditutup.'
-                );
+                ->with('error', 'Tiket sudah diproses.');
         }
 
         $antrean->delete();
 
         return redirect()
-            ->route('kiosk.index');
+            ->route('kiosk.index')
+            ->with('info', 'Antrean dibatalkan.');
     }
 }

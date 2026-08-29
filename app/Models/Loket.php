@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Loket extends Model
@@ -30,7 +31,7 @@ class Loket extends Model
         return $this->belongsTo(User::class, 'active_petugas_id');
     }
 
-    public function antreanAsal()
+    public function antrean()
     {
         return $this->hasMany(Antrean::class, 'loket_asal_id');
     }

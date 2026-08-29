@@ -194,11 +194,23 @@ class AdminController extends Controller
             }
         }
 
+        $loketIds = $gerai->loket->pluck('id');
+
+        // 1. HAPUS SEMUA AKUN PETUGAS yang terikat dengan Gerai ini atau Loket di Gerai ini
+        User::where('role', 'PETUGAS')
+            ->where(function ($query) use ($gerai, $loketIds) {
+                $query->where('assigned_gerai_id', $gerai->id)
+                      ->orWhere('gerai_id', $gerai->id)
+                      ->orWhereIn('assigned_loket_id', $loketIds);
+            })->delete();
+
+        // 2. Hapus loket yang terhubung dengan gerai
         Loket::where('gerai_id', $gerai->id)->delete();
         
+        // 3. Hapus gerai
         $gerai->delete();
 
-        return back()->with('success', 'Gerai beserta loket di dalamnya berhasil dihapus!');
+        return back()->with('success', 'Gerai beserta loket dan akun petugas di dalamnya berhasil dihapus!');
     }
 
     // HALAMAN DETAIL GERAI
@@ -206,23 +218,23 @@ class AdminController extends Controller
     {
         $gerai = Gerai::findOrFail($id);
 
-        // Paginate Loket (misal 5 data per halaman)
+        // Paginate Loket
         $loketList = Loket::where('gerai_id', $id)
             ->paginate(5, ['*'], 'loket_page');
 
-        // Ambil semua petugas di gerai ini/tanpa gerai untuk dropdown penugasan loket
+        // Petugas KHUSUS untuk Gerai ini saja
         $allPetugas = User::where('role', 'PETUGAS')
             ->where(function ($query) use ($id) {
-                $query->where('gerai_id', $id)
-                    ->orWhereNull('gerai_id');
+                $query->where('assigned_gerai_id', $id)
+                      ->orWhere('gerai_id', $id);
             })
             ->get();
 
-        // Paginate Tabel Direktori Petugas (misal 5 data per halaman)
+        // Paginate Direktori Petugas khusus gerai ini
         $petugasList = User::where('role', 'PETUGAS')
             ->where(function ($query) use ($id) {
-                $query->where('gerai_id', $id)
-                    ->orWhereNull('gerai_id');
+                $query->where('assigned_gerai_id', $id)
+                      ->orWhere('gerai_id', $id);
             })
             ->paginate(5, ['*'], 'petugas_page');
 

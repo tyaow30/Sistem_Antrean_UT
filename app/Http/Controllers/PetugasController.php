@@ -15,19 +15,20 @@ class PetugasController extends Controller
 {
     // Halaman Utama Dashboard Petugas
     public function index()
-    {
-        /** @var \App\Models\User $user */
-        $user = auth()->user();
+{
+    /** @var \App\Models\User $user */
+    $user = auth()->user();
 
-        $today = now()->toDateString();
+    $today = now()->toDateString();
 
-        // 1. Pastikan petugas mempunyai loket
-        if (!$user || !$user->assigned_loket_id) {
-            return back()->with(
-                'error',
-                'Anda belum memiliki loket.'
-            );
-        }
+    // 1. Pastikan petugas mempunyai loket (Ubah bagian ini)
+    if (!$user || !$user->assigned_loket_id) {
+        // PERBAIKAN: Gunakan redirect()->route() ke halaman aman, BUKAN back()
+        return redirect()->route('kiosk.index')->with(
+            'error',
+            'Anda belum memiliki loket.'
+        );
+    }
 
         // 2. Aktifkan loket untuk petugas yang sedang login
         Loket::where('id', $user->assigned_loket_id)

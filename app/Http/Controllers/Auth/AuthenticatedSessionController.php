@@ -12,17 +12,22 @@ use App\Models\Loket;
 
 class AuthenticatedSessionController extends Controller
 {
-    /**
-     * Display the login view.
-     */
-    public function create(): View
+    public function create(): View|RedirectResponse
     {
+        if (Auth::check()) {
+            $role = strtoupper(Auth::user()->role ?? '');
+            if ($role === 'ADMIN') {
+                return redirect()->route('admin.dashboard');
+            }
+            if ($role === 'PETUGAS') {
+                return redirect()->route('petugas.dashboard');
+            }
+            return redirect()->route('kiosk.index');
+        }
+
         return view('auth.login');
     }
 
-    /**
-     * Handle an incoming authentication request.
-     */
     public function store(LoginRequest $request): RedirectResponse
     {
         $request->authenticate();
@@ -31,66 +36,35 @@ class AuthenticatedSessionController extends Controller
 
         $user = $request->user();
 
-        // ==========================================
-        // CEK KHUSUS PETUGAS
-        // ==========================================
-        if ($user->role === 'PETUGAS') {
+        $user->update([
+            'active_session_id' => $request->session()->getId()
+        ]);
 
-            // Kalau akun masih tercatat sedang digunakan
-            if ($user->active_session_id !== null) {
+        $role = strtoupper($user->role ?? '');
 
-                Auth::guard('web')->logout();
-
-                $request->session()->invalidate();
-                $request->session()->regenerateToken();
-
-                return back()
-                    ->withInput($request->only('email'))
-                    ->withErrors([
-                        'email' => 'Akun petugas ini sedang digunakan di perangkat lain. Silakan logout terlebih dahulu.',
-                    ]);
-            }
-
-            // Simpan session ID yang sedang digunakan
-            $user->update([
-                'active_session_id' => $request->session()->getId(),
-            ]);
-        }
-
-        // ==========================================
-        // REDIRECT
-        // ==========================================
-
-        if ($user->role === 'ADMIN') {
+        if ($role === 'ADMIN') {
             return redirect()->route('admin.dashboard');
         }
 
-        if ($user->role === 'PETUGAS') {
+        if ($role === 'PETUGAS') {
             return redirect()->route('petugas.dashboard');
         }
 
-        return redirect('/');
+        return redirect()->route('kiosk.index');
     }
 
-    /**
-     * Destroy an authenticated session.
-     */
     public function destroy(Request $request): RedirectResponse
     {
         $user = $request->user();
 
-        // Jika user yang logout adalah PETUGAS
-        if ($user && $user->role === 'PETUGAS') {
-
-            // Nonaktifkan loket petugas
-            if ($user->assigned_loket_id) {
+        if ($user) {
+            if (strtoupper($user->role ?? '') === 'PETUGAS' && $user->assigned_loket_id) {
                 Loket::where('id', $user->assigned_loket_id)->update([
                     'status' => 'INACTIVE',
                     'active_petugas_id' => null,
                 ]);
             }
 
-            // Hapus session login aktif
             $user->update([
                 'active_session_id' => null,
             ]);
@@ -101,6 +75,6 @@ class AuthenticatedSessionController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/');
+        return redirect('/login');
     }
 }
