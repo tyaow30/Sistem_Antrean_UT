@@ -54,13 +54,10 @@ class PetugasController extends Controller
             ->orderBy('id', 'asc')
             ->get();
 
-        // =====================================================
-        // 5. CEK PETUGAS LAIN DI GERAI YANG BENAR-BENAR AKTIF
-        // =====================================================
 
-        // Anggap petugas aktif kalau heartbeat-nya masih dalam
-        // 30 detik terakhir.
-        $batasAktif = now()->subSeconds(30);
+        // 5. CEK PETUGAS LAIN DI GERAI YANG BENAR-BENAR AKTIF
+        
+        $batasAktif = now()->subMinutes(10);
 
         $adaPetugasLainAktif = Loket::where(
                 'gerai_id',
@@ -72,9 +69,7 @@ class PetugasController extends Controller
             ->where('last_heartbeat_at', '>=', $batasAktif)
             ->exists();
 
-        // =====================================================
         // 6. CEK APAKAH PETUGAS INI MASIH PUNYA ANTREAN
-        // =====================================================
 
         // Antrean WAITING milik loket sendiri
         $adaAntreanWaiting = Antrean::where('tanggal', $today)
@@ -173,14 +168,7 @@ class PetugasController extends Controller
         Loket::where('status', 'ACTIVE')
             ->whereNotNull('active_petugas_id')
             ->where('id', '!=', $loket->id)
-            ->where(function ($query) {
-                $query->whereNull('last_heartbeat_at')
-                    ->orWhere(
-                        'last_heartbeat_at',
-                        '<',
-                        now()->subSeconds(30)
-                    );
-            })
+            ->where('last_heartbeat_at', '<', now()->subMinutes(10))
             ->update([
                 'status' => 'INACTIVE',
                 'active_petugas_id' => null,

@@ -47,25 +47,21 @@ class KioskController extends Controller
 
         // PERBAIKAN: Longgarkan batas toleransi heartbeat menjadi 5 menit (atau hapus jika ingin murni berdasarkan status aktif petugas)
         // Kalau mau lebih aman dari masalah jeda waktu, kita buat jadi 5 menit atau cek null-nya.
-        $batasAktif = now()->subMinutes(30);
+        $batasAktif = now()->subMinutes(10);
 
         // Ambil SEMUA loket aktif di gerai ini
         $loketList = Loket::where('gerai_id', $id)
             ->where('status', 'ACTIVE')
             ->whereNotNull('active_petugas_id')
-            ->where(function ($query) use ($batasAktif) {
-                // Mencegah loket hilang jika heartbeat belum sempat terkirim tapi petugas sudah login
-                $query->where('last_heartbeat_at', '>=', $batasAktif)
-                      ->orWhereNull('last_heartbeat_at');
-            })
+            ->where('last_heartbeat_at', '>=', $batasAktif)
             ->withCount(['antrean as total_antrean' => function ($query) use ($sesi) {
                 $query->where('sesi_hari_id', $sesi->id)
                     ->whereIn('status', ['WAITING', 'CALLING', 'PRINTING']);
             }])
             ->get();
 
-        return view('kiosk.pilih-loket', compact('gerai', 'loketList'));
-    }
+                return view('kiosk.pilih-loket', compact('gerai', 'loketList'));
+            }
 
     // =========================================================
     // CETAK TIKET (DRAFT RECORD "PRINTING")
