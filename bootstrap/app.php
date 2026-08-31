@@ -18,6 +18,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => EnsureUserHasRole::class,
         ]);
     })
+
+    ->withMiddleware(function (Middleware $middleware) {
+    $middleware->redirectUsersTo('/dashboard');
+})
+
     ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();

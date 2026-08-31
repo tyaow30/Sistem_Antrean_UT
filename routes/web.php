@@ -97,4 +97,6 @@ Route::get('/display/{geraiId}', [DisplayController::class, 'show'])->name('disp
 Route::get('/api/display/{geraiId}/latest', [DisplayController::class, 'getLatest'])->name('api.display.latest');
 
 // AUTH
+
+Route::get('/logout', [App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'destroy']);
 require __DIR__ . '/auth.php';

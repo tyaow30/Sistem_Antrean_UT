@@ -349,7 +349,7 @@ class AdminController extends Controller
     }
 
     // PENUGASAN PETUGAS KE LOKET (SINKRONISASI 2 ARAH)
-    public function updatePetugas(Request $request, $id)
+public function updatePetugas(Request $request, $id)
     {
         $request->validate([
             'active_petugas_id' => 'nullable|exists:users,id',
@@ -364,14 +364,14 @@ class AdminController extends Controller
             return redirect()->back();
         }
 
+        // Cek apakah petugas baru sudah ditugaskan di LOKET LAIN
         if ($newPetugasId) {
-            // Cek apakah petugas sudah ditugaskan di LOKET LAIN
             $sudahDipakai = Loket::where('active_petugas_id', $newPetugasId)
                                 ->where('id', '!=', $id)
                                 ->exists();
 
             if ($sudahDipakai) {
-                return redirect()->back()->with('error', 'Petugas tersebut sudah bertugas di loket lain!');
+                return redirect()->back()->with('error', 'Petugas tersebut sudah bertugas di loket lain! Lepaskan dulu dari loket sebelumnya.');
             }
         }
 
@@ -381,28 +381,21 @@ class AdminController extends Controller
             if ($oldPetugasId) {
                 User::where('id', $oldPetugasId)->update([
                     'assigned_loket_id' => null,
+                    'assigned_gerai_id' => null, // KOSONGKAN JUGA PENUGASAN GERAINYA
                 ]);
             }
 
-            // 2. Jika PETUGAS BARU sebelumnya punya loket lain, kosongkan loket lamanya terlebih dahulu
-            if ($newPetugasId) {
-                Loket::where('active_petugas_id', $newPetugasId)
-                    ->where('id', '!=', $loket->id)
-                    ->update([
-                        'active_petugas_id' => null,
-                        'status' => 'INACTIVE',
-                    ]);
-            }
-
-            // 3. Update data Loket saat ini
+            // 2. Update data Loket saat ini
+            // Jika petugas dikosongkan (Ganti jadi "Pilih Petugas"), otomatis set loket jadi INACTIVE
             $loket->update([
                 'active_petugas_id' => $newPetugasId,
+                'status' => $newPetugasId ? $loket->status : 'INACTIVE',
             ]);
 
-            // 4. Hubungkan Petugas baru ke Loket & Gerai ini
+            // 3. Hubungkan Petugas BARU ke Loket & Gerai ini
             if ($newPetugasId) {
                 User::where('id', $newPetugasId)->update([
-                    'gerai_id'          => $loket->gerai_id,
+                    'assigned_gerai_id' => $loket->gerai_id, // UPDATE ASSIGNED_GERAI_ID, BUKAN GERAI_ID
                     'assigned_loket_id' => $loket->id,
                 ]);
             }
@@ -415,6 +408,7 @@ class AdminController extends Controller
     {
         $user = User::where('role', 'PETUGAS')->findOrFail($id);
 
+        // Jika petugas yang dihapus sedang aktif di loket, nonaktifkan loketnya
         Loket::where('active_petugas_id', $user->id)->update([
             'status'            => 'INACTIVE',
             'active_petugas_id' => null
