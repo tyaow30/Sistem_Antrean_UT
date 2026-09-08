@@ -8,19 +8,14 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\KioskController;
 
 // =========================================================
-// KIOSK ROUTES
+// KIOSK ROUTES (Single Page: Form & Pilih Loket Jadi Satu)
 // =========================================================
 Route::get('/', [KioskController::class, 'index'])->name('kiosk.index');
 Route::get('/kiosk', [KioskController::class, 'index']);
-Route::get('/kiosk/gerai/{id}', [KioskController::class, 'pilihGerai'])->name('kiosk.gerai');
-
-// Mendukung GET & POST untuk cetak tiket
-Route::match(['get', 'post'], '/kiosk/cetak/{loket_id}', [KioskController::class, 'cetakTiket'])->name('kiosk.cetak');
-
-// Konfirmasi & Batal Tiket
+Route::post('/kiosk/cetak/{layanan_id}', [KioskController::class, 'cetakTiket'])->name('kiosk.cetak');
+Route::get('/kiosk/tiket/{id}', [KioskController::class, 'previewTiket'])->name('kiosk.tiket.preview');
 Route::post('/kiosk/tiket/{id}/confirm', [KioskController::class, 'confirmCetak'])->name('kiosk.tiket.confirm');
 Route::post('/kiosk/tiket/{id}/cancel', [KioskController::class, 'cancelCetak'])->name('kiosk.tiket.cancel');
-
 
 // =========================================================
 // DASHBOARD REDIRECTOR
@@ -68,14 +63,11 @@ Route::middleware(['auth', 'role:PETUGAS'])->group(function () {
 // =========================================================
 Route::middleware(['auth', 'role:ADMIN'])->group(function () {
     Route::get('/admin/dashboard', [AdminController::class, 'index'])->name('admin.dashboard');
-    Route::get('/admin/gerai/{id}', [AdminController::class, 'showGeraiDetail'])->name('admin.gerai.detail');
     Route::post('/admin/toggle-sesi', [AdminController::class, 'toggleSesi'])->name('admin.toggle-sesi');
+    Route::post('/admin/tutup-sesi', [AdminController::class, 'tutupSesi'])->name('admin.tutup-sesi');
 
-    // CRUD GERAI
-    Route::post('/admin/gerai', [AdminController::class, 'storeGerai'])->name('admin.gerai.store');
-    Route::put('/admin/gerai/{id}', [AdminController::class, 'updateGerai'])->name('admin.gerai.update');
-    Route::patch('/admin/gerai/{id}/toggle', [AdminController::class, 'toggleGerai'])->name('admin.gerai.toggle');
-    Route::delete('/admin/gerai/{id}', [AdminController::class, 'destroyGerai'])->name('admin.gerai.destroy');
+    Route::get('/admin/layanan', [AdminController::class, 'indexLayanan'])->name('admin.layanan.index');
+    Route::get('/admin/rekap', [AdminController::class, 'indexRekap'])->name('admin.rekap.index');
 
     // CRUD LOKET
     Route::post('/admin/loket', [AdminController::class, 'storeLoket'])->name('admin.loket.store');
@@ -87,16 +79,21 @@ Route::middleware(['auth', 'role:ADMIN'])->group(function () {
     Route::patch('/admin/petugas/{id}/toggle', [AdminController::class, 'togglePetugas'])->name('admin.petugas.toggle');
     Route::delete('/admin/petugas/{id}', [AdminController::class, 'destroyPetugas'])->name('admin.petugas.destroy');
     Route::patch('/admin/loket/{id}/update-petugas', [AdminController::class, 'updatePetugas'])->name('admin.loket.update-petugas');
+
+    Route::post('/admin/layanan', [AdminController::class, 'storeLayanan'])->name('admin.layanan.store');
+    Route::delete('/admin/layanan/{id}', [AdminController::class, 'destroyLayanan'])->name('admin.layanan.destroy');
 });
 
 
 // =========================================================
 // DISPLAY ROUTES
 // =========================================================
-Route::get('/display/{geraiId}', [DisplayController::class, 'show'])->name('display.show');
-Route::get('/api/display/{geraiId}/latest', [DisplayController::class, 'getLatest'])->name('api.display.latest');
+Route::get('/display', [DisplayController::class, 'show'])->name('display.show');
+Route::get('/api/display/latest', [DisplayController::class, 'getLatest'])->name('api.display.latest');
 
-// AUTH
 
+// =========================================================
+// AUTH ROUTES
+// =========================================================
 Route::get('/logout', [App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'destroy']);
 require __DIR__ . '/auth.php';

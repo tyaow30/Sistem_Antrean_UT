@@ -3,35 +3,31 @@
 namespace App\Http\Controllers;
 
 use App\Models\Antrean;
-use App\Models\Gerai;
 use Illuminate\Http\Request;
 
 class DisplayController extends Controller
 {
     // Halaman Layar Display TV
-    public function show($geraiId)
+    public function show()
     {
-        $gerai = Gerai::findOrFail($geraiId);
-        return view('display.show', compact('gerai'));
+        return view('display.show');
     }
 
     // API Polling untuk Ambil Data Realtime
-    public function getLatest($geraiId)
+    public function getLatest()
     {
         $today = now()->toDateString();
 
-        // Ambil antrean yang sedang dipanggil/dilayani
-        $antreanAktif = Antrean::with('loketMelayani')
+        // Ambil antrean yang sedang dipanggil/dilayani (dari semua loket)
+        $antreanAktif = Antrean::with('loketAsal')
             ->where('tanggal', $today)
-            ->where('gerai_id', $geraiId)
             ->whereIn('status', ['CALLED', 'SERVING'])
             ->orderBy('updated_at', 'desc')
             ->first();
 
         // Ambil riwayat 5 antrean terakhir yang dipanggil
-        $riwayat = Antrean::with('loketMelayani')
+        $riwayat = Antrean::with('loketAsal')
             ->where('tanggal', $today)
-            ->where('gerai_id', $geraiId)
             ->whereIn('status', ['CALLED', 'SERVING', 'DONE'])
             ->orderBy('updated_at', 'desc')
             ->take(5)

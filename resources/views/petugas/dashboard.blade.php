@@ -67,10 +67,16 @@
             @if($antreanSaatIni)
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
                     {{-- NOMOR ANTREAN AKTIF --}}
-                    <div class="md:col-span-7 flex items-center justify-center border-b md:border-b-0 md:border-r border-white/20 pb-6 md:pb-0 md:pr-6 min-h-[160px]">
+                    <div class="md:col-span-7 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-white/20 pb-6 md:pb-0 md:pr-6 min-h-[160px]">
                         <span class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white text-center">
-                            {{ $antreanSaatIni->kode_antrean }}
+                            {{ $antreanSaatIni->kode_antrean ?? sprintf('%03d', $antreanSaatIni->nomor_antrean) }}
                         </span>
+                        <div class="mt-2 text-center text-brand-yellow font-bold uppercase text-sm">
+                            {{ $antreanSaatIni->serviceAwal->nama_layanan ?? 'Layanan Umum' }}
+                        </div>
+                        <div class="text-center text-white/80 text-xs mt-1">
+                            {{ $antreanSaatIni->nama ?? 'Tanpa Nama' }} ({{ $antreanSaatIni->nim ?? '-' }})
+                        </div>
                     </div>
 
                     {{-- TOMBOL AKSI PEMANGGILAN --}}
@@ -130,11 +136,21 @@
                 <div class="space-y-3 overflow-y-auto max-h-72 pr-1 flex-1">
                     @forelse($antreanSaya as $item)
                         <div class="bg-brand-cardblue p-3.5 rounded-2xl flex items-center justify-between shadow-inner">
-                            <span class="font-extrabold text-lg text-white tracking-wide">
-                                {{ $item->kode_antrean }}
-                            </span>
-                            <span class="text-xs font-semibold text-white/90">
-                                {{ $item->created_at->format('H:i') }}
+                            <div class="flex items-center gap-4">
+                                <span class="font-extrabold text-2xl text-white tracking-wide">
+                                    {{ $item->kode_antrean ?? sprintf('%03d', $item->nomor_antrean) }}
+                                </span>
+                                <div class="flex flex-col">
+                                    <span class="text-sm font-bold text-brand-yellow uppercase leading-tight">
+                                        {{ $item->serviceAwal->nama_layanan ?? 'Layanan Umum' }}
+                                    </span>
+                                    <span class="text-xs text-white/90">
+                                        {{ $item->nama ?? 'Tanpa Nama' }}
+                                    </span>
+                                </div>
+                            </div>
+                            <span class="text-xs font-semibold text-white/90 whitespace-nowrap">
+                                {{ \Carbon\Carbon::parse($item->waktu_ambil)->format('H:i') }}
                             </span>
                         </div>
                     @empty
@@ -155,11 +171,11 @@
                     @forelse($antreanBantuan as $item)
                         <div class="bg-brand-yellow p-3.5 rounded-2xl flex items-center justify-between text-slate-900 shadow-md">
                             <div>
-                                <span class="font-black text-lg text-brand-darkblue block leading-tight">
-                                    {{ $item->kode_antrean }}
+                                <span class="font-black text-xl text-brand-darkblue block leading-tight">
+                                    {{ $item->kode_antrean ?? sprintf('%03d', $item->nomor_antrean) }}
                                 </span>
                                 <span class="text-xs font-bold text-brand-darkblue/80">
-                                    Asal : Loket {{ $item->loketAsal->nomor_loket ?? '-' }}
+                                    Asal: Loket {{ $item->loketAsal->nomor_loket ?? '-' }}
                                 </span>
                             </div>
 

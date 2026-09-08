@@ -61,23 +61,11 @@ class User extends Authenticatable
         return $this->belongsTo(Loket::class, 'assigned_loket_id');
     }
 
-    /**
-     * Relasi ke Gerai yang ditugaskan
-     */
-    public function assignedGerai()
-    {
-        return $this->belongsTo(Gerai::class, 'assigned_gerai_id');
-    }
 
     // Alias untuk kompatibilitas kode lama
     public function loket()
     {
         return $this->assignedLoket();
-    }
-
-    public function gerai()
-    {
-        return $this->assignedGerai();
     }
 
     public function geraiPemilik()

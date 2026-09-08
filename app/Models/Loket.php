@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Loket extends Model
 {
+    use HasFactory;
+
     protected $table = 'loket';
 
     protected $fillable = [
@@ -21,9 +24,10 @@ class Loket extends Model
         'last_heartbeat_at' => 'datetime',
     ];
 
-    public function gerai()
+    // Relasi activePetugas yang dicari oleh AdminController
+    public function activePetugas()
     {
-        return $this->belongsTo(Gerai::class);
+        return $this->belongsTo(User::class, 'active_petugas_id');
     }
 
     public function petugasAktif()
@@ -40,4 +44,14 @@ class Loket extends Model
     {
         return $this->hasMany(Antrean::class, 'loket_melayani_id');
     }
+
+    public function services(): BelongsToMany
+    {
+        return $this->belongsToMany(Service::class, 'counter_services', 'loket_id', 'service_id');
+    }
+
+    public function layanans()
+{
+    return $this->hasMany(Layanan::class);
+}
 }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Display Antrean - {{ $gerai->nama_gerai }}</title>
+    <title>Display Antrean - UNIVERSITAS TERBUKA Surabaya</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
@@ -61,7 +61,7 @@
                     Silakan menuju ke
                 </p>
                 <p id="loket-aktif" class="text-2xl lg:text-4xl font-extrabold text-brand-yellow uppercase tracking-wider">
-                    {{ strtoupper($gerai->nama_gerai) }} - MENUNGGU PANGGILAN
+                     MENUNGGU PANGGILAN
                 </p>
             </div>
         </section>
@@ -89,14 +89,11 @@
     <!-- JAVASCRIPT LOGIC -->
     <script>
         let isAudioAllowed = false;
-        const namaGerai = "{{ strtoupper($gerai->nama_gerai) }}";
 
-        // Izinkan audio diputar setelah ada interaksi pengguna
         document.body.addEventListener('click', () => {
             isAudioAllowed = true;
         }, { once: true });
 
-        // Jam Digital dengan format titik (09 . 09 . 15)
         function updateClock() {
             const now = new Date();
             const hours = String(now.getHours()).padStart(2, '0');
@@ -107,7 +104,6 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // Suara Text-to-Speech
         function speak(text) {
             if (!isAudioAllowed || !('speechSynthesis' in window)) return;
 
@@ -118,17 +114,20 @@
             window.speechSynthesis.speak(utterance);
         }
 
-        // Fetch Data Initial Display
         async function fetchInitialData() {
             try {
-                const response = await fetch("{{ route('api.display.latest', $gerai->id) }}");
+                const response = await fetch("{{ route('api.display.latest') }}");
                 const data = await response.json();
 
                 if (data.aktif) {
-                    const nomor = data.aktif.kode_antrean;
-                    const loket = data.aktif.loket_melayani ? data.aktif.loket_melayani.nomor_loket : '-';
-                    document.getElementById('nomor-aktif').innerText = nomor;
-                    document.getElementById('loket-aktif').innerText = `${namaGerai} - LOKET ${loket}`;
+                    const nomor = data.aktif.nomor_antrean;
+                    const loketNomor = data.aktif.loket_asal ? data.aktif.loket_asal.nomor_loket : '-';
+                    
+                    // Format tampilan: Kasih prefiks L(NomorLoket)-NomorAntrean (Contoh: L1-2)
+                    const formatNomor = `L${loketNomor}-${nomor}`;
+                    
+                    document.getElementById('nomor-aktif').innerText = formatNomor;
+                    document.getElementById('loket-aktif').innerText = `MENUJU LOKET ${loketNomor}`;
                 }
 
                 updateRiwayatUI(data.riwayat);
@@ -137,35 +136,39 @@
             }
         }
 
-        // Render Riwayat UI (Struktur Card Biru Tua)
         function updateRiwayatUI(riwayat) {
             if (riwayat && riwayat.length > 0) {
-                const listHtml = riwayat.map(item => `
-                    <div class="bg-brand-darkblue text-white text-center py-3.5 px-4 rounded-xl shadow-sm">
-                        <span class="text-2xl lg:text-3xl font-extrabold tracking-wider block">
-                            ${item.kode_antrean}
-                        </span>
-                    </div>
-                `).join('');
+                const listHtml = riwayat.map(item => {
+                    const loketNomor = item.loket_asal ? item.loket_asal.nomor_loket : '-';
+                    const formatNomor = `L${loketNomor}-${item.nomor_antrean}`;
+                    return `
+                        <div class="bg-brand-darkblue text-white text-center py-3.5 px-4 rounded-xl shadow-sm">
+                            <span class="text-2xl lg:text-3xl font-extrabold tracking-wider block">
+                                ${formatNomor}
+                            </span>
+                        </div>
+                    `;
+                }).join('');
                 document.getElementById('daftar-riwayat').innerHTML = listHtml;
             }
         }
 
         fetchInitialData();
 
-        // WebSocket Event Listener (Laravel Reverb)
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof window.Echo !== 'undefined') {
-                window.Echo.channel(`display-gerai.{{ $gerai->id }}`)
+                window.Echo.channel('display-antrean')
                     .listen('.antrean.dipanggil', (e) => {
                         const antrean = e.antrean;
-                        const nomor = antrean.kode_antrean;
-                        const loket = antrean.loket_melayani ? antrean.loket_melayani.nomor_loket : '-';
+                        const nomor = antrean.nomor_antrean;
+                        const loketNomor = antrean.loket_asal ? antrean.loket_asal.nomor_loket : '-';
+                        const formatNomor = `L${loketNomor}-${nomor}`;
 
-                        document.getElementById('nomor-aktif').innerText = nomor;
-                        document.getElementById('loket-aktif').innerText = `${namaGerai} - LOKET ${loket}`;
+                        document.getElementById('nomor-aktif').innerText = formatNomor;
+                        document.getElementById('loket-aktif').innerText = `MENUJU LOKET ${loketNomor}`;
 
-                        speak(`Nomor antrean ${nomor}, silakan menuju ke ${namaGerai}, loket ${loket}`);
+                        // Suara AI yang lebih natural dan tidak membingungkan
+                        speak(`Nomor antrean ${nomor}, silakan menuju ke loket ${loketNomor}`);
 
                         fetchInitialData();
                     });

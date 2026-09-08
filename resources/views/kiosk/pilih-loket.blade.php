@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pilih Loket - {{ $gerai->nama_gerai }}</title>
+    <title>Pilih Loket - PELMA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
@@ -35,15 +35,6 @@
             <img src="{{ asset('images/logo-UT-2.png') }}" alt="Universitas Terbuka" class="h-20 lg:h-24 w-auto object-contain">
         </div>
 
-        {{-- JUDUL GERAI --}}
-        <div class="space-y-2">
-            <h1 class="text-4xl sm:text-5xl font-extrabold text-brand-darkblue tracking-tight uppercase">
-                {{ $gerai->nama_gerai }}
-            </h1>
-            <p class="text-lg sm:text-xl font-semibold text-brand-yellow tracking-wide">
-                Silahkan pilih loket untuk ambil nomor antrean
-            </p>
-        </div>
 
         {{-- ALERT ERROR --}}
         @if(session('error'))
@@ -83,10 +74,10 @@
 
     </div>
 
-    {{-- KEMBALI KE PILIHAN GERAI --}}
+    {{-- KEMBALI KE HALAMAN UTAMA --}}
     <div class="pb-4">
         <a href="{{ route('kiosk.index') }}" class="inline-flex items-center gap-2 text-slate-900 hover:text-brand-darkblue font-medium text-base transition-colors">
-            <span>&larr;</span> Kembali ke Pilihan Gerai
+            <span>&larr;</span> Kembali ke Halaman Utama
         </a>
     </div>
 

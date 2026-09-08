@@ -14,11 +14,6 @@ class Antrean extends Model
         return $this->belongsTo(SesiHari::class, 'sesi_hari_id');
     }
 
-    public function gerai()
-    {
-        return $this->belongsTo(Gerai::class, 'gerai_id');
-    }
-
     public function loketAsal()
     {
         return $this->belongsTo(Loket::class, 'loket_asal_id');
@@ -32,5 +27,15 @@ class Antrean extends Model
     public function petugas()
     {
         return $this->belongsTo(User::class, 'petugas_id');
+    }
+
+    public function layanan()
+    {
+        return $this->belongsTo(Layanan::class, 'layanan_id');
+    }
+
+    public function loket()
+    {
+        return $this->belongsTo(Loket::class, 'loket_id');
     }
 }
