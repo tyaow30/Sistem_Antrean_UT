@@ -1,76 +1,113 @@
 @extends('layouts.admin')
 
-@section('title', 'Dashboard')
-@section('header_title', 'Monitoring Antrean')
-
 @section('content')
+<!-- BANNER KUNING -->
+<div class="bg-[#FDE047] p-6 rounded-3xl shadow-sm mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+        <span class="inline-block bg-[#0B3B82] text-white text-xs font-black px-4 py-1.5 rounded-full mb-2">PELMA (PELAYANAN MAHASISWA)</span>
+        <h1 class="text-3xl font-black text-gray-900 tracking-tight">Dashboard Administrator</h1>
+        <p class="text-sm font-medium text-gray-700 mt-1">Pantau operasional pelayanan mahasiswa secara real-time.</p>
+    </div>
+    <form action="{{ route('admin.toggle-sesi') }}" method="POST">
+        @csrf
+        <button type="submit" class="bg-[#22C55E] hover:bg-green-600 text-white font-extrabold px-6 py-3.5 rounded-2xl shadow-md transition text-sm tracking-wide">
+            {{ ($sesiHariIni && $sesiHariIni->status == 'OPEN') ? 'TUTUP SESI HARI INI' : 'BUKA SESI HARI INI' }}
+        </button>
+    </form>
+</div>
 
-@if(session('success'))
-        <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6 rounded-r-lg shadow-sm" role="alert">
-            <p class="font-bold">Berhasil!</p>
-            <p>{{ session('success') }}</p>
-        </div>
-    @endif
-    <!-- Banner Utama -->
-    <div class="bg-brand-yellow rounded-2xl p-8 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center shadow-md relative overflow-hidden">
-        <div class="z-10">
-            <span class="inline-block bg-brand-darkblue text-white text-sm font-bold px-4 py-1.5 rounded-full mb-3">
-                PELMA (PELAYANAN MAHASISWA)
-            </span>
-            <h2 class="text-3xl md:text-4xl font-extrabold text-slate-900 mb-2">Dashboard Administrator</h2>
-            <p class="text-slate-800 font-medium">Pantau operasional pelayanan mahasiswa secara real-time hari ini.</p>
-        </div>
-        <div class="z-10 mt-6 md:mt-0">
-            <form action="{{ route('admin.toggle-sesi') }}" method="POST">
-                @csrf
-                
-                @if(isset($sesiHariIni) && $sesiHariIni->is_open)
-                    <!-- Tombol TUTUP SESI (Dengan Konfirmasi Pop-up) -->
-                    <button type="submit" 
-                            onclick="return confirm('Yakin akan mengakhiri sesi? Data jumlah pengunjung akan masuk ke chart dan antrean akan di-reset kembali untuk besok.')"
-                            class="bg-[#D32F2F] hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-transform transform hover:scale-105">
-                        TUTUP SESI HARI INI
-                    </button>
-                @else
-                    <!-- Tombol BUKA SESI (Langsung jalan tanpa Pop-up) -->
-                    <button type="submit" 
-                            class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-transform transform hover:scale-105">
-                        BUKA SESI HARI INI
-                    </button>
-                @endif
-            </form>
+<!-- 4 KARTU STATISTIK (Warna Biru + Angka Kuning) -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="bg-[#0B3B82] text-white p-5 rounded-2xl shadow-md flex justify-between items-center">
+        <span class="text-xs font-bold uppercase tracking-wider text-gray-200">TOTAL PENGUNJUNG</span>
+        <span class="text-4xl font-black text-[#FACC15]">{{ $totalTiket ?? 0 }}</span>
+    </div>
+    <div class="bg-[#0B3B82] text-white p-5 rounded-2xl shadow-md flex justify-between items-center">
+        <span class="text-xs font-bold uppercase tracking-wider text-gray-200">MENUNGGU</span>
+        <span class="text-4xl font-black text-[#FACC15]">{{ $menunggu ?? 0 }}</span>
+    </div>
+    <div class="bg-[#0B3B82] text-white p-5 rounded-2xl shadow-md flex justify-between items-center">
+        <span class="text-xs font-bold uppercase tracking-wider text-gray-200">SELESAI DILAYANI</span>
+        <span class="text-4xl font-black text-[#FACC15]">{{ $selesai ?? 0 }}</span>
+    </div>
+    <div class="bg-[#0B3B82] text-white p-5 rounded-2xl shadow-md flex justify-between items-center">
+        <span class="text-xs font-bold uppercase tracking-wider text-gray-200">DILEWATI / BATAL</span>
+        <span class="text-4xl font-black text-[#FACC15]">{{ $dilewati ?? 0 }}</span>
+    </div>
+</div>
+
+<!-- 2 CHART (Latar Biru Tua & Biru Muda) -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Chart Seminggu -->
+    <div class="bg-[#0B3B82] p-5 rounded-2xl shadow-md text-white">
+        <h3 class="text-center font-bold text-base mb-4">Pengunjung Tiap Hari Selama Seminggu</h3>
+        <div class="h-64">
+            <canvas id="chartSeminggu"></canvas>
         </div>
     </div>
 
-    <!-- Statistik Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-        <!-- Card Total Tiket -->
-        <div class="bg-brand-darkblue rounded-2xl p-6 flex justify-between items-center shadow-lg text-white">
-            <h3 class="text-sm font-bold uppercase tracking-wider text-white/80">Total Tiket</h3>
-            <span class="text-5xl font-black text-brand-yellow">{{ $totalTiket }}</span>
-        </div>
-
-        <!-- Card Menunggu -->
-        <div class="bg-brand-darkblue rounded-2xl p-6 flex justify-between items-center shadow-lg text-white">
-            <h3 class="text-sm font-bold uppercase tracking-wider text-white/80">Menunggu</h3>
-            <span class="text-5xl font-black text-brand-yellow">{{ $menunggu }}</span>
-        </div>
-
-        <!-- Card Selesai Dilayani -->
-        <div class="bg-brand-darkblue rounded-2xl p-6 flex justify-between items-center shadow-lg text-white">
-            <h3 class="text-sm font-bold uppercase tracking-wider text-white/80">Selesai Dilayani</h3>
-            <span class="text-5xl font-black text-brand-yellow">{{ $selesai }}</span>
-        </div>
-
-        <!-- Card Dilewati / Batal -->
-        <div class="bg-brand-darkblue rounded-2xl p-6 flex justify-between items-center shadow-lg text-white">
-            <h3 class="text-sm font-bold uppercase tracking-wider text-white/80">Dilewati / Batal</h3>
-            <span class="text-5xl font-black text-brand-yellow">{{ $dilewati }}</span>
+    <!-- Chart Loket Hari Ini -->
+    <div class="bg-[#3B82F6] p-5 rounded-2xl shadow-md text-white">
+        <h3 class="text-center font-bold text-base mb-4">Pengunjung Tiap Loket Hari Ini</h3>
+        <div class="h-64">
+            <canvas id="chartLoket"></canvas>
         </div>
     </div>
+</div>
 
-    <!-- Grafik Placeholder -->
-    <div class="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 min-h-[300px] flex items-center justify-center">
-        <p class="text-slate-400 font-medium">Ruang untuk Chart/Grafik Rata-rata Waktu Tunggu...</p>
-    </div>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Simpan data ke variabel PHP dulu sebelum di-json_encode
+        @php
+            $defaultSemingguLabels = ['31/8/26', '1/9/26', '2/9/26', '3/9/26', '4/9/26', '5/9/26', '6/9/26'];
+            $defaultSemingguData = [0,0,0,0,0,0,0];
+            $defaultLoketLabels = ['LOKET 1', 'LOKET 2', 'LOKET 3', 'LOKET 4'];
+            $defaultLoketData = [0,0,0,0];
+        @endphp
+
+        // Chart 1: Statistik Antrean Seminggu
+        new Chart(document.getElementById('chartSeminggu'), {
+            type: 'bar',
+            data: {
+                labels: {!! json_encode($chartSemingguLabels ?? $defaultSemingguLabels) !!},
+                datasets: [{
+                    data: {!! json_encode($chartSemingguData ?? $defaultSemingguData) !!},
+                    backgroundColor: '#3B82F6',
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: '#FFFFFF', font: { weight: 'bold' } }, grid: { display: false } },
+                    y: { ticks: { color: '#FFFFFF' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } }
+                }
+            }
+        });
+
+        // Chart 2: Statistik Per Loket
+        new Chart(document.getElementById('chartLoket'), {
+            type: 'bar',
+            data: {
+                labels: {!! json_encode($chartLoketLabels ?? $defaultLoketLabels) !!},
+                datasets: [{
+                    data: {!! json_encode($chartLoketData ?? $defaultLoketData) !!},
+                    backgroundColor: '#0B3B82',
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: '#FFFFFF', font: { weight: 'bold' } }, grid: { display: false } },
+                    y: { ticks: { color: '#FFFFFF' }, grid: { display: false } }
+                }
+            }
+        });
+    });
+</script>
 @endsection

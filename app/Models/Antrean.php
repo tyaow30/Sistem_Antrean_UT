@@ -7,7 +7,21 @@ use Illuminate\Database\Eloquent\Model;
 class Antrean extends Model
 {
     protected $table = 'antrean';
-    protected $guarded = [];
+    
+    protected $fillable = [
+        'tanggal',
+        'loket_asal_id',
+        'loket_pelayanan_id',
+        'service_awal_id',
+        'petugas_id',
+        'nomor_antrean',
+        'status',
+        'waktu_ambil',
+        'nama',
+        'nim',
+        'no_hp',
+        'kendala',
+    ];
 
     public function sesiHari()
     {
@@ -19,9 +33,9 @@ class Antrean extends Model
         return $this->belongsTo(Loket::class, 'loket_asal_id');
     }
 
-    public function loketMelayani()
+    public function loketPelayanan()
     {
-        return $this->belongsTo(Loket::class, 'loket_melayani_id');
+        return $this->belongsTo(Loket::class, 'loket_pelayanan_id');
     }
 
     public function petugas()
@@ -29,13 +43,8 @@ class Antrean extends Model
         return $this->belongsTo(User::class, 'petugas_id');
     }
 
-    public function layanan()
+    public function serviceAwal()
     {
-        return $this->belongsTo(Layanan::class, 'layanan_id');
-    }
-
-    public function loket()
-    {
-        return $this->belongsTo(Loket::class, 'loket_id');
+        return $this->belongsTo(Layanan::class, 'service_awal_id');
     }
 }

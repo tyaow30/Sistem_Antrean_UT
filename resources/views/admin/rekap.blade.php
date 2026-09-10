@@ -1,58 +1,101 @@
 @extends('layouts.admin')
 
-@section('title', 'Rekap Laporan')
-@section('header_title', 'Rekapitulasi Antrean')
-
 @section('content')
-    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-        <div class="flex justify-between items-center mb-6">
+<!-- BANNER KUNING -->
+<div class="bg-[#FDE047] p-6 rounded-3xl shadow-sm mb-6">
+    <span class="inline-block bg-[#0B3B82] text-white text-xs font-black px-4 py-1.5 rounded-full mb-2">PELMA (PELAYANAN MAHASISWA)</span>
+    <h1 class="text-3xl font-black text-gray-900 tracking-tight">Riwayat & Rekap Antrean</h1>
+    <p class="text-sm font-medium text-gray-700 mt-1">Data histori seluruh mahasiswa yang telah mengambil tiket antrean.</p>
+</div>
+
+<!-- PANEL FILTER & ACTION -->
+<div class="bg-[#3B82F6] p-6 rounded-2xl shadow-md mb-6">
+    <form action="{{ route('admin.rekap.index') }}" method="GET" class="flex flex-col lg:flex-row lg:items-end gap-3 justify-between">
+        
+        <!-- GROUP INPUT FILTER -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 flex-1">
+            <!-- Search Nama -->
             <div>
-                <h3 class="text-lg font-bold text-slate-800">Riwayat & Rekap Antrean Keseluruhan</h3>
-                <p class="text-slate-500 text-sm">Data histori seluruh mahasiswa yang telah mengambil tiket antrean.</p>
+                <label class="block text-white text-xs font-bold mb-1">CARI NAMA</label>
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari nama..." class="w-full bg-white border-0 rounded-xl px-3 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-yellow-400">
             </div>
-            <!-- Tombol Export Excel (Placeholder / Siap dikembangkan) -->
-            <button onclick="alert('Fitur export Excel siap dihubungkan ke library Excel!')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow transition flex items-center">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                Export Excel
-            </button>
+
+            <!-- Filter Loket -->
+            <div>
+                <label class="block text-white text-xs font-bold mb-1">LOKET</label>
+                <select name="loket_id" class="w-full bg-white border-0 rounded-xl px-3 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-yellow-400">
+                    <option value="">Semua Loket</option>
+                    @foreach($lokets as $l)
+                        <option value="{{ $l->id }}" {{ request('loket_id') == $l->id ? 'selected' : '' }}>{{ $l->nama_loket }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <!-- Filter Layanan -->
+            <div>
+                <label class="block text-white text-xs font-bold mb-1">LAYANAN</label>
+                <select name="layanan_id" class="w-full bg-white border-0 rounded-xl px-3 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-yellow-400">
+                    <option value="">Semua Layanan</option>
+                    @foreach($layanans as $lay)
+                        <option value="{{ $lay->id }}" {{ request('layanan_id') == $lay->id ? 'selected' : '' }}>{{ $lay->nama_layanan }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <!-- Range Tanggal -->
+            <div>
+                <label class="block text-white text-xs font-bold mb-1">RENTANG TANGGAL</label>
+                <div class="flex items-center space-x-1">
+                    <input type="date" name="start_date" value="{{ request('start_date', date('Y-m-d')) }}" class="w-full bg-white border-0 rounded-xl px-2 py-2 text-xs text-gray-800">
+                    <span class="text-white text-xs font-bold">s/d</span>
+                    <input type="date" name="end_date" value="{{ request('end_date', date('Y-m-d')) }}" class="w-full bg-white border-0 rounded-xl px-2 py-2 text-xs text-gray-800">
+                </div>
+            </div>
         </div>
 
-        <!-- Tabel Rekap -->
-        <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="bg-slate-100 text-slate-700 uppercase text-xs tracking-wider">
-                        <th class="p-3 rounded-l-lg">No Tiket</th>
-                        <th class="p-3">Tanggal</th>
-                        <th class="p-3">Layanan</th>
-                        <th class="p-3">Loket</th>
-                        <th class="p-3">Status</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100 text-sm">
-                    @forelse($antreans as $antrean)
-                        <tr>
-                            <td class="p-3 font-black text-brand-darkblue">{{ $antrean->nomor_antrean ?? $antrean->id }}</td>
-                            <td class="p-3 text-slate-600">{{ $antrean->tanggal ?? $antrean->created_at->format('Y-m-d') }}</td>
-                            <td class="p-3 font-medium text-slate-800">{{ $antrean->layanan->nama_layanan ?? '-' }}</td>
-                            <td class="p-3">{{ $antrean->loket->nama_loket ?? '-' }}</td>
-                            <td class="p-3">
-                                @if($antrean->status == 'DONE')
-                                    <span class="bg-green-100 text-green-800 text-xs font-bold px-2.5 py-1 rounded-full">Selesai</span>
-                                @elseif($antrean->status == 'WAITING')
-                                    <span class="bg-yellow-100 text-yellow-800 text-xs font-bold px-2.5 py-1 rounded-full">Menunggu</span>
-                                @else
-                                    <span class="bg-red-100 text-red-800 text-xs font-bold px-2.5 py-1 rounded-full">{{ $antrean->status }}</span>
-                                @endif
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="5" class="p-6 text-center text-slate-400">Belum ada histori rekap antrean.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
+        <!-- TOMBOL EXPORT EXCEL (Ukuran Terkunci & Ringkas) -->
+        <div class="w-full lg:w-auto flex-shrink-0">
+            <a href="{{ route('admin.rekap.export', request()->all()) }}" class="w-full lg:w-auto bg-[#22C55E] hover:bg-green-600 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition flex items-center justify-center space-x-2 shadow-md">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                <span>Export Excel</span>
+            </a>
         </div>
+    </form>
+
+    <!-- TABEL REKAP -->
+    <div class="mt-6 overflow-x-auto rounded-xl">
+        <table class="w-full text-left text-sm text-white">
+            <thead class="bg-[#FDE047] text-gray-900 font-extrabold uppercase text-xs">
+                <tr>
+                    <th class="p-3">No Tiket</th>
+                    <th class="p-3">Tanggal</th>
+                    <th class="p-3">Nama Mahasiswa</th>
+                    <th class="p-3">Layanan</th>
+                    <th class="p-3">Loket</th>
+                    <th class="p-3">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-blue-400/30 bg-[#3B82F6]">
+                @forelse($antreans as $antrean)
+                <tr class="hover:bg-blue-600/50 transition">
+                    <td class="p-3 font-extrabold text-yellow-300">{{ $antrean->nomor_antrean }}</td>
+                    <td class="p-3 text-xs text-blue-100 font-medium">{{ \Carbon\Carbon::parse($antrean->tanggal)->format('d/m/Y') }}</td>
+                    <td class="p-3 font-bold">{{ $antrean->nama_mahasiswa }}</td>
+                    <td class="p-3 font-medium">{{ $antrean->layanan->nama_layanan ?? '-' }}</td>
+                    <td class="p-3 font-medium">{{ $antrean->loket->nama_loket ?? '-' }}</td>
+                    <td class="p-3">
+                        <span class="px-2.5 py-1 rounded-full text-xs font-extrabold bg-yellow-400 text-gray-900">
+                            {{ $antrean->status }}
+                        </span>
+                    </td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="6" class="p-4 text-center text-blue-200">Tidak ada data antrean yang ditemukan.</td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
     </div>
+</div>
 @endsection

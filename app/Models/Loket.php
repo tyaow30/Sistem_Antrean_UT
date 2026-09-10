@@ -15,6 +15,7 @@ class Loket extends Model
     protected $fillable = [
         'gerai_id',
         'nomor_loket',
+        'nama_loket',
         'status',
         'active_petugas_id',
         'last_heartbeat_at',
