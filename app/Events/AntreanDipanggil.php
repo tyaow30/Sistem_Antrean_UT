@@ -18,14 +18,14 @@ class AntreanDipanggil implements ShouldBroadcastNow
     public function __construct(Antrean $antrean)
     {
         // Load relasi loket agar nama/nomor loket terbawa ke display
-        $this->antrean = $antrean->load('loketMelayani');
+        $this->antrean = $antrean->load(['loketPelayanan','serviceAwal']);
     }
 
     public function broadcastOn(): array
     {
         // Channel public berdasarkan ID Gerai
         return [
-            new Channel('display-gerai.' . $this->antrean->gerai_id),
+            new Channel('display-antrean'),
         ];
     }
 

@@ -3,225 +3,214 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Petugas - Loket {{ $user->loket->nomor_loket ?? '-' }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Plus Jakarta Sans', 'sans-serif'],
-                    },
-                    colors: {
-                        brand: {
-                            yellow: '#FFDC5F',
-                            darkblue: '#0A4595',
-                            lightblue: '#4A7ED4',
-                            cardblue: '#3B72CB',
-                            red: '#D12727',
-                            green: '#48BB78',
-                            btnblue: '#1E60C6',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <title>Dashboard Petugas - Sistem Antrean</title>
+    @vite('resources/css/app.css')
+    <!-- Menambahkan Font Awesome untuk Icon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-white text-slate-900 antialiased p-6 lg:p-10">
+<body class="bg-gray-50 min-h-screen">
 
-    <div class="max-w-5xl mx-auto space-y-6">
+    <!-- Container Utama -->
+    <div class="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
 
-        {{-- LOGO UNIVERSITAS TERBUKA --}}
-        <div class="flex items-center justify-start">
-            <img src="{{ asset('images/logo-UT-2.png') }}" alt="Universitas Terbuka" class="h-14 w-auto object-contain">
-        </div>
-
-        {{-- BANNER HEADER KUNING --}}
-        <div class="bg-brand-yellow p-6 rounded-3xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-                <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                    Petugas : {{ $user->name }}
-                </h1>
-                <p class="text-lg font-bold text-slate-800 mt-1">
-                    {{ $user->gerai->nama_gerai ?? 'Gerai Utama' }} | <span class="text-brand-darkblue">LOKET {{ $user->loket->nomor_loket ?? '-' }}</span>
-                </p>
+        <!-- HEADER & NAVBAR -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <!-- Logo -->
+            <div class="flex items-center gap-3">
+                <img src="{{ asset('images/logosby.png') }}" alt="Logo UT" class="h-12 md:h-14">
             </div>
 
-            <form action="{{ route('logout') }}" method="POST">
-                @csrf
-                <button type="submit" class="bg-brand-red hover:bg-red-700 text-white font-black text-sm px-8 py-3 rounded-2xl shadow-md transition-all uppercase tracking-wider">
-                    LOG OUT
-                </button>
-            </form>
+            <!-- Menu Navigasi -->
+            <div class="flex items-center gap-2 md:gap-4 bg-white p-2 rounded-full shadow-sm">
+                <a href="#" class="bg-[#FFCC00] text-[#003B70] font-bold py-2 px-6 rounded-full transition hover:bg-yellow-500">
+                    Dashboard Loket
+                </a>
+                <a href="{{ route('petugas.rekap') }}" class="text-[#FFCC00] font-bold py-2 px-6 rounded-full transition hover:bg-gray-100">
+                    Rekap & Laporan
+                </a>
+                
+                <!-- Tombol Log Out -->
+                <form method="POST" action="{{ route('logout') }}" class="m-0">
+                    @csrf
+                    <button type="submit" class="bg-[#D32F2F] text-white font-bold py-2 px-6 rounded-full transition hover:bg-red-700">
+                        LOG OUT
+                    </button>
+                </form>
+            </div>
         </div>
 
-        {{-- SECTION UTAMA: SEDANG DILAYANI --}}
-        <div class="bg-brand-darkblue p-6 sm:p-8 rounded-3xl text-white shadow-xl">
-            <h2 class="text-xs sm:text-sm font-extrabold tracking-wider uppercase mb-2 text-white/90">
-                SEDANG DILAYANI
-            </h2>
+        <!-- KOTAK IDENTITAS PETUGAS -->
+        @php
+            $loketId = $loket->id ?? (Auth::user()->assigned_loket_id ?? 1);
+            $namaLoket = $loket->nama_loket ?? ('LOKET ' . $loketId);
+        @endphp
 
-            @if($antreanSaatIni)
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-                    {{-- NOMOR ANTREAN AKTIF --}}
-                    <div class="md:col-span-7 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-white/20 pb-6 md:pb-0 md:pr-6 min-h-[160px]">
-                        <span class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white text-center">
-                            {{ $antreanSaatIni->kode_antrean ?? sprintf('%03d', $antreanSaatIni->nomor_antrean) }}
-                        </span>
-                        <div class="mt-2 text-center text-brand-yellow font-bold uppercase text-sm">
-                            {{ $antreanSaatIni->serviceAwal->nama_layanan ?? 'Layanan Umum' }}
-                        </div>
-                        <div class="text-center text-white/80 text-xs mt-1">
-                            {{ $antreanSaatIni->nama ?? 'Tanpa Nama' }} ({{ $antreanSaatIni->nim ?? '-' }})
-                        </div>
+        <div class="bg-[#FFCC00] rounded-2xl p-6 mb-6 shadow-md border-b-[6px] border-yellow-600">
+            <h2 class="text-xl md:text-2xl font-bold text-[#003B70]">Petugas : {{ Auth::user()->name ?? 'Petugas Loket' }}</h2>
+            <p class="text-[#003B70] text-lg mt-1">Gerai Utama Senay | <span class="font-extrabold uppercase">{{ $namaLoket }}</span></p>
+        </div>
+
+        <!-- MAIN GRID CONTENT -->
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            
+            <!-- PANEL KIRI : SEDANG DILAYANI -->
+            <div class="lg:col-span-3 bg-[#004A8D] rounded-2xl p-6 md:p-8 text-white shadow-xl flex flex-col justify-between min-h-[400px]">
+                
+                <div>
+                    <p class="font-semibold tracking-wide text-sm mb-4">SEDANG DILAYANI</p>
+                    
+                    <!-- Area Nomor Antrean -->
+                    <div class="mb-8">
+                        <h1 class="text-7xl md:text-8xl font-extrabold tracking-tighter">
+                            {{ isset($antreanSaatIni) && $antreanSaatIni ? 'L' . $loketId . ' - ' . str_pad($antreanSaatIni->nomor_antrean, 3, '0', STR_PAD_LEFT) : '-' }}
+                        </h1>
                     </div>
-
-                    {{-- TOMBOL AKSI PEMANGGILAN --}}
-                    <div class="md:col-span-5 space-y-3">
-                        {{-- Tombol Panggil Ulang --}}
-                        <form action="{{ route('petugas.panggil-ulang', $antreanSaatIni->id) }}" method="POST">
-                            @csrf
-                            <button type="submit" class="w-full bg-brand-yellow hover:bg-yellow-300 text-brand-darkblue font-extrabold text-sm py-3 rounded-xl shadow-md transition-all uppercase tracking-wider">
-                                PANGGIL ULANG
-                            </button>
-                        </form>
-
-                        {{-- Tombol Selesai --}}
-                        <form action="{{ route('petugas.update-status', $antreanSaatIni->id) }}" method="POST">
-                            @csrf
-                            <input type="hidden" name="status" value="DONE">
-                            <button type="submit" class="w-full bg-brand-green hover:bg-emerald-600 text-white font-extrabold text-sm py-3 rounded-xl shadow-md transition-all uppercase tracking-wider">
-                                SELESAI
-                            </button>
-                        </form>
-
-                        {{-- Tombol Lewati --}}
-                        <form action="{{ route('petugas.update-status', $antreanSaatIni->id) }}" method="POST">
-                            @csrf
-                            <input type="hidden" name="status" value="SKIPPED">
-                            <button type="submit" class="w-full bg-brand-red hover:bg-red-700 text-white font-extrabold text-sm py-3 rounded-xl shadow-md transition-all uppercase tracking-wider">
-                                LEWATI
-                            </button>
-                        </form>
+                    
+                    <!-- Area Detail Mahasiswa (Dinamis dari Database) -->
+                    <div class="space-y-3 mb-8 text-lg">
+                        <p class="flex items-center gap-3">
+                            <i class="fa-solid fa-user w-6 text-center text-xl"></i> 
+                            {{ isset($antreanSaatIni) && $antreanSaatIni ? $antreanSaatIni->nama : 'Belum ada antrean dipanggil' }}
+                        </p>
+                        <p class="flex items-center gap-3">
+                            <i class="fa-solid fa-id-card w-6 text-center text-xl"></i> 
+                            {{ isset($antreanSaatIni) && $antreanSaatIni ? $antreanSaatIni->nim : '-' }}
+                        </p>
+                        <p class="flex items-center gap-3 text-yellow-300">
+                            <i class="fa-solid fa-triangle-exclamation w-6 text-center text-xl"></i> 
+                            {{ isset($antreanSaatIni) && $antreanSaatIni && $antreanSaatIni->kendala ? $antreanSaatIni->kendala : 'Tidak ada kendala khusus' }}
+                        </p>
                     </div>
                 </div>
-            @else
-                {{-- TAMPILAN JIKA BELUM ADA ANTREAN DIPANGGIL --}}
-                <div class="flex flex-col md:flex-row items-center justify-between gap-6 py-4">
-                    <div class="text-white/70 text-lg font-bold">
-                        Belum ada antrean dipanggil
-                    </div>
-                    <form action="{{ route('petugas.panggil-next') }}" method="POST" class="w-full md:w-auto">
+
+                <!-- Tombol Aksi 4 Kotak -->
+                <div class="grid grid-cols-2 gap-4">
+                    <form action="{{ isset($antreanSaatIni) && $antreanSaatIni ? route('petugas.panggil-ulang', $antreanSaatIni->id) : route('petugas.panggil-next') }}" method="POST" class="m-0">
                         @csrf
-                        <button type="submit" class="w-full md:w-auto bg-brand-yellow hover:bg-yellow-300 text-brand-darkblue font-black text-base px-10 py-4 rounded-2xl shadow-lg transition-all uppercase tracking-wider">
-                            PANGGIL NEXT
+                        <button type="submit" class="w-full bg-[#FFCC00] text-[#003B70] font-bold py-3 px-4 rounded-xl shadow-md hover:bg-yellow-500 transition">
+                            {{ isset($antreanSaatIni) && $antreanSaatIni ? 'PANGGIL ULANG' : 'PANGGIL BERIKUTNYA' }}
                         </button>
                     </form>
+                    <button type="button" onclick="bukaModal()" class="w-full bg-[#F57C00] text-white font-bold py-3 px-4 rounded-xl shadow-md hover:bg-orange-600 transition">ALIHKAN</button>                     
+                    
+                    <form action="{{ isset($antreanSaatIni) && $antreanSaatIni ? route('petugas.selesai', $antreanSaatIni->id) : '#' }}" method="POST" class="m-0">
+                        @csrf
+                        <button type="submit" class="w-full bg-[#388E3C] text-white font-bold py-3 px-4 rounded-xl shadow-md hover:bg-green-700 transition">SELESAI</button>
+                    </form>
+
+                    <form action="{{ isset($antreanSaatIni) && $antreanSaatIni ? route('petugas.lewati', $antreanSaatIni->id) : '#' }}" method="POST" class="m-0">
+                        @csrf
+                        <button type="submit" class="w-full bg-[#D32F2F] text-white font-bold py-3 px-4 rounded-xl shadow-md hover:bg-red-700 transition">LEWATI</button>
+                    </form>
                 </div>
-            @endif
-        </div>
+            </div>
 
-        {{-- BOTTOM GRID: ANTREAN LOKET & ANTREAN BANTUAN --}}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <!-- PANEL KANAN : DAFTAR ANTREAN -->
+            <div class="lg:col-span-2 flex flex-col gap-6">
+                
+                <!-- Kotak Antrean Loket Ini -->
+                <div class="bg-[#004A8D] rounded-2xl p-5 text-white shadow-xl flex-1 flex flex-col">
+                    <p class="font-semibold text-sm mb-4">Antrean Loket Ini ({{ isset($daftarAntreanLoket) ? count($daftarAntreanLoket) : 0 }})</p>
+                    
+                    <div class="space-y-3 flex-1 overflow-y-auto max-h-[250px] pr-2">
+                        @forelse($daftarAntreanLoket ?? [] as $antre)
+                            <div class="bg-[#4C7BAD] bg-opacity-40 p-3 rounded-lg flex justify-between items-center border border-[#7A9EBD]">
+                                <span class="font-bold text-xl">L{{ $loketId }} - {{ str_pad($antre->nomor_antrean, 3, '0', STR_PAD_LEFT) }}</span>
+                                <span class="text-xs text-gray-200">{{ $antre->serviceAwal->nama_layanan ?? 'Layanan' }}</span>
+                            </div>
+                        @empty
+                            <p class="text-sm text-gray-300 text-center py-4">Tidak ada antrean menunggu di loket ini.</p>
+                        @endforelse
+                    </div>
+                </div>
 
-            {{-- KOLOM ANTREAN LOKET INI --}}
-            <div class="bg-brand-darkblue p-6 rounded-3xl text-white shadow-xl min-h-[320px] flex flex-col">
-                <h3 class="text-base font-bold text-white mb-4">
-                    Antrean Loket Ini ({{ $antreanSaya->count() }})
-                </h3>
-
-                <div class="space-y-3 overflow-y-auto max-h-72 pr-1 flex-1">
-                    @forelse($antreanSaya as $item)
-                        <div class="bg-brand-cardblue p-3.5 rounded-2xl flex items-center justify-between shadow-inner">
-                            <div class="flex items-center gap-4">
-                                <span class="font-extrabold text-2xl text-white tracking-wide">
-                                    {{ $item->kode_antrean ?? sprintf('%03d', $item->nomor_antrean) }}
-                                </span>
-                                <div class="flex flex-col">
-                                    <span class="text-sm font-bold text-brand-yellow uppercase leading-tight">
-                                        {{ $item->serviceAwal->nama_layanan ?? 'Layanan Umum' }}
-                                    </span>
-                                    <span class="text-xs text-white/90">
-                                        {{ $item->nama ?? 'Tanpa Nama' }}
-                                    </span>
+                <!-- Kotak Antrean Bantuan -->
+                @if(in_array($loketId, [2, 3]))
+                    @php
+                        $partnerLoket = ($loketId == 2) ? 3 : 2;
+                    @endphp
+                    <div class="bg-[#0A4595] rounded-2xl p-5 text-[#ffffff] shadow-xl flex-1 flex flex-col border-b-[6px] border-yellow-600">
+                        <p class="font-bold text-sm mb-4">Antrean Bantuan ({{ isset($daftarAntreanBantuan) ? count($daftarAntreanBantuan) : 0 }})</p>
+                        
+                        <div class="space-y-3 flex-1 overflow-y-auto max-h-[250px] pr-2">
+                            @forelse($daftarAntreanBantuan ?? [] as $bantu)
+                                <div class="bg-[#FFCC00] p-3 rounded-lg flex justify-between items-center text-[#004A8D]">
+                                    <div>
+                                        <span class="font-bold text-xl block">L{{ $partnerLoket }} - {{ str_pad($bantu->nomor_antrean, 3, '0', STR_PAD_LEFT) }}</span>
+                                        <span class="text-xs font-semibold">Asal : Loket {{ $partnerLoket }} - {{ $bantu->serviceAwal->nama_layanan ?? '' }}</span>
+                                    </div>
+                                    <form action="{{ route('petugas.ambil-bantuan', $bantu->id) }}" method="POST">
+                                        @csrf
+                                        <button type="submit" class="bg-[#004A8D] text-white text-xs font-bold py-2 px-4 rounded-lg hover:bg-blue-900 transition">BANTU</button>
+                                    </form>
                                 </div>
-                            </div>
-                            <span class="text-xs font-semibold text-white/90 whitespace-nowrap">
-                                {{ \Carbon\Carbon::parse($item->waktu_ambil)->format('H:i') }}
-                            </span>
+                            @empty
+                                <p class="text-sm text-blue-100 text-center py-4">Tidak ada permintaan bantuan.</p>
+                            @endforelse
                         </div>
-                    @empty
-                        <div class="flex items-center justify-center h-full py-10 text-white/60 text-sm font-medium">
-                            Tidak ada antrean menunggu
-                        </div>
-                    @endforelse
-                </div>
+                    </div>
+                @endif
+
             </div>
-
-            {{-- KOLOM ANTREAN BANTUAN --}}
-            <div class="bg-brand-darkblue p-6 rounded-3xl text-white shadow-xl min-h-[320px] flex flex-col">
-                <h3 class="text-base font-bold text-white mb-4">
-                    Antrean Bantuan
-                </h3>
-
-                <div class="space-y-3 overflow-y-auto max-h-72 pr-1 flex-1">
-                    @forelse($antreanBantuan as $item)
-                        <div class="bg-brand-yellow p-3.5 rounded-2xl flex items-center justify-between text-slate-900 shadow-md">
-                            <div>
-                                <span class="font-black text-xl text-brand-darkblue block leading-tight">
-                                    {{ $item->kode_antrean ?? sprintf('%03d', $item->nomor_antrean) }}
-                                </span>
-                                <span class="text-xs font-bold text-brand-darkblue/80">
-                                    Asal: Loket {{ $item->loketAsal->nomor_loket ?? '-' }}
-                                </span>
-                            </div>
-
-                            <form action="{{ route('petugas.panggil-bantuan', $item->id) }}" method="POST">
-                                @csrf
-                                <button type="submit" class="bg-brand-lightblue hover:bg-blue-600 text-white text-xs font-extrabold px-4 py-2 rounded-xl transition-all shadow">
-                                    Bantu
-                                </button>
-                            </form>
-                        </div>
-                    @empty
-                        <div class="flex items-center justify-center h-full py-10 text-white/60 text-sm font-medium">
-                            Tidak ada antrean butuh bantuan
-                        </div>
-                    @endforelse
-                </div>
-            </div>
-
+        </div>
+        
+        <!-- Footer / Copyright -->
+        <div class="text-center text-gray-400 text-sm mt-8">
+            &copy; 2026 Universitas Terbuka. All rights reserved.
         </div>
 
     </div>
 
-    {{-- SCRIPT HEARTBEAT --}}
+    <!-- MODAL PENGALIHAN ANTREAN -->
+    <div id="modalPengalihan" class="fixed inset-0 z-50 hidden bg-black bg-opacity-60 flex justify-center items-center backdrop-blur-sm transition-opacity">
+        <div class="bg-[#004A8D] rounded-2xl w-full max-w-md p-6 shadow-2xl border-4 border-[#FFCC00]">
+            <h3 class="text-[#FFCC00] text-xl font-bold text-center mb-6 uppercase tracking-wider">Pengalihan Antrean</h3>
+            
+            <form action="{{ isset($antreanSaatIni) && $antreanSaatIni ? route('petugas.alih-antrean', $antreanSaatIni->id) : '#' }}" method="POST">
+                @csrf
+                
+                <!-- No Antrean -->
+                <div class="mb-4">
+                    <label class="block text-white text-sm font-semibold mb-2">No. Antrean :</label>
+                    <input type="text" value="{{ isset($antreanSaatIni) && $antreanSaatIni ? 'L' . $loketId . ' - ' . str_pad($antreanSaatIni->nomor_antrean, 3, '0', STR_PAD_LEFT) : '-' }}" readonly class="w-full bg-[#003B70] text-gray-300 border border-[#4C7BAD] rounded-lg p-2.5 focus:outline-none cursor-not-allowed font-bold">
+                </div>
+
+                <!-- Pilihan Loket Tujuan -->
+                <div class="mb-4">
+                    <label class="block text-white text-sm font-semibold mb-2">Pilih Loket Tujuan :</label>
+                    <select name="loket_tujuan" required class="w-full bg-white text-[#003B70] font-semibold border-none rounded-lg p-2.5 focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                        <option value="" disabled selected>-- Pilih Loket Tujuan --</option>
+                        @foreach($daftarLoket ?? [] as $lkt)
+                            <option value="{{ $lkt->id }}">
+                                {{ $lkt->nama_loket }} 
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Catatan -->
+                <div class="mb-8">
+                    <label class="block text-white text-sm font-semibold mb-2">Catatan (Opsional) :</label>
+                    <input type="text" name="catatan" placeholder="Contoh : Kurang stempel" class="w-full bg-white text-gray-800 border-none rounded-lg p-2.5 focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                </div>
+
+                <!-- Tombol Aksi -->
+                <div class="flex justify-end gap-3">
+                    <button type="button" onclick="tutupModal()" class="bg-[#D32F2F] text-white font-bold py-2.5 px-6 rounded-lg hover:bg-red-700 transition shadow-lg">Batal</button>
+                    <button type="submit" {{ !isset($antreanSaatIni) || !$antreanSaatIni ? 'disabled' : '' }} class="bg-[#388E3C] text-white font-bold py-2.5 px-6 rounded-lg hover:bg-green-700 transition shadow-lg disabled:opacity-50">Kirim Pengalihan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
-        function kirimHeartbeat() {
-            fetch("{{ route('petugas.heartbeat') }}", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRF-TOKEN": "{{ csrf_token() }}",
-                    "Accept": "application/json"
-                },
-                body: JSON.stringify({})
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log("Heartbeat:", data);
-            })
-            .catch(error => {
-                console.error("Heartbeat gagal:", error);
-            });
+        function bukaModal() {
+            document.getElementById('modalPengalihan').classList.remove('hidden');
         }
 
-        // Kirim heartbeat pertama kali & berkala
-        kirimHeartbeat();
-        setInterval(kirimHeartbeat, 10000);
+        function tutupModal() {
+            document.getElementById('modalPengalihan').classList.add('hidden');
+        }
     </script>
 
 </body>

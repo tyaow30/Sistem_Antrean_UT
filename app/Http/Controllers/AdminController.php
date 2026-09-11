@@ -11,8 +11,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
-
-// Import class PhpSpreadsheet untuk export Excel & Chart
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Chart\Chart;
@@ -68,7 +66,7 @@ class AdminController extends Controller
         foreach ($lokets as $loket) {
             $chartLoketLabels[] = $loket->nama_loket;
             $chartLoketData[]   = Antrean::where('tanggal', $today)
-                ->where('loket_id', $loket->id)
+                ->where('loket_pelayanan_id', $loket->id)
                 ->count();
         }
 
@@ -266,7 +264,7 @@ class AdminController extends Controller
 
         // Filter Loket
         if ($request->filled('loket_id')) {
-            $query->where('loket_id', $request->loket_id);
+            $query->where('loket_pelayanan_id', $request->loket_id);
         }
 
         // Filter Layanan

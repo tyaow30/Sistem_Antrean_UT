@@ -10,9 +10,10 @@
     </div>
     <form action="{{ route('admin.toggle-sesi') }}" method="POST">
         @csrf
-        <button type="submit" class="bg-[#22C55E] hover:bg-green-600 text-white font-extrabold px-6 py-3.5 rounded-2xl shadow-md transition text-sm tracking-wide">
-            {{ ($sesiHariIni && $sesiHariIni->status == 'OPEN') ? 'TUTUP SESI HARI INI' : 'BUKA SESI HARI INI' }}
+        <button type="submit" class="{{ ($sesiHariIni && $sesiHariIni->is_open) ? 'bg-[#EF4444] hover:bg-red-600' : 'bg-[#22C55E] hover:bg-green-600' }} text-white font-extrabold px-6 py-3.5 rounded-2xl shadow-md transition text-sm tracking-wide">
+            {{ ($sesiHariIni && $sesiHariIni->is_open) ? 'TUTUP SESI HARI INI' : 'BUKA SESI HARI INI' }}
         </button>
+    </form>
     </form>
 </div>
 
