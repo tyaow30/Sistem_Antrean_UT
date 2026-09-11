@@ -3,6 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\SesiHari;
+use App\Models\Loket;
+use App\Models\User;
+use App\Models\Service;
 
 class Antrean extends Model
 {
@@ -13,6 +17,7 @@ class Antrean extends Model
         'loket_asal_id',
         'loket_pelayanan_id',
         'service_awal_id',
+        'service_aktual_id',
         'petugas_id',
         'nomor_antrean',
         'status',
@@ -45,6 +50,11 @@ class Antrean extends Model
 
     public function serviceAwal()
     {
-        return $this->belongsTo(Layanan::class, 'service_awal_id');
+        return $this->belongsTo(Service::class, 'service_awal_id');
+    }
+
+    public function serviceAktual()
+    {
+        return $this->belongsTo(Service::class, 'service_aktual_id');
     }
 }

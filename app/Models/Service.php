@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Service extends Model
 {
@@ -15,14 +15,15 @@ class Service extends Model
     protected $fillable = [
         'nama_layanan',
         'deskripsi',
+        'loket_id',
         'is_active',
     ];
 
     /**
-     * Relasi ke Loket (Many-to-Many melalui tabel pivot counter_services)
+     * Relasi ke Loket (One-to-Many: 1 Layanan milik 1 Loket)
      */
-    public function lokets(): BelongsToMany
+    public function loket(): BelongsTo
     {
-        return $this->belongsToMany(Loket::class, 'counter_services', 'service_id', 'loket_id');
+        return $this->belongsTo(Loket::class, 'loket_id');
     }
 }

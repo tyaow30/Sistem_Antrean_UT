@@ -79,6 +79,7 @@ Route::middleware(['auth', 'role:ADMIN'])->group(function () {
     // FITUR MANAJEMEN PETUGAS
     Route::get('/admin/petugas', [AdminController::class, 'indexPetugas'])->name('admin.petugas.index');
     Route::post('/admin/petugas', [AdminController::class, 'storePetugas'])->name('admin.petugas.store');
+    Route::put('/admin/petugas/{id}', [AdminController::class, 'updateAkunPetugas'])->name('admin.petugas.update'); // Diubah ke updateAkunPetugas
     Route::delete('/admin/petugas/{id}', [AdminController::class, 'destroyPetugas'])->name('admin.petugas.destroy');
 
     // CRUD LOKET (Diubah ke LoketController)
@@ -89,6 +90,7 @@ Route::middleware(['auth', 'role:ADMIN'])->group(function () {
 
     // CRUD LAYANAN
     Route::post('/admin/layanan', [AdminController::class, 'storeLayanan'])->name('admin.layanan.store');
+    Route::put('/admin/layanan/{id}', [AdminController::class, 'updateLayanan'])->name('admin.layanan.update');
     Route::delete('/admin/layanan/{id}', [AdminController::class, 'destroyLayanan'])->name('admin.layanan.destroy');
 });
 

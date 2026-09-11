@@ -40,7 +40,7 @@
 
     <!-- HEADER LOGO UT -->
     <header class="w-full text-center pt-2 pb-4 no-print">
-        <img src="{{ asset('images/logo-UT-2.png') }}" alt="Universitas Terbuka Surabaya" class="h-16 mx-auto object-contain">
+        <img src="{{ asset('images/logosby.png') }}" alt="Universitas Terbuka Surabaya" class="h-16 mx-auto object-contain">
     </header>
 
     <!-- CONTAINER STRUK TIKET -->
@@ -48,7 +48,7 @@
         
         <!-- LOGO STAMP TIKET -->
         <div class="flex justify-center mb-2">
-            <img src="{{ asset('images/logo-UT-2.png') }}" alt="Logo UT" class="h-10 object-contain mx-auto">
+            <img src="{{ asset('images/sbykeci.png') }}" alt="Logo UT" class="h-10 object-contain mx-auto">
         </div>
         
         <div class="mb-2">
@@ -69,7 +69,7 @@
         <!-- NOMOR ANTREAN UTAMA -->
         <div class="py-2">
             <span class="block text-5xl md:text-6xl font-black text-slate-900 tracking-tight leading-none">
-                L{{ $loket->nomor_loket }} - {{ sprintf('%03d', $antrean->nomor_antrean) }}
+                {{ $loket->nomor_loket }} - {{ sprintf('%03d', $antrean->nomor_antrean) }}
             </span>
         </div>
 
@@ -77,7 +77,7 @@
         <div class="my-2">
             <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">LOKET TUJUAN</p>
             <p class="text-lg font-black text-slate-900 uppercase tracking-tight">
-                LOKET {{ $loket->nomor_loket }}
+                {{ $loket->nomor_loket }}
             </p>
         </div>
 

@@ -6,7 +6,7 @@ use App\Models\User;
 use App\Models\Loket;
 use App\Models\Antrean;
 use App\Models\SesiHari;
-use App\Models\Layanan;
+use App\Models\Service; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -37,7 +37,6 @@ class AdminController extends Controller
         $startDate = now()->subDays(6)->startOfDay();
         $endDate   = now()->endOfDay();
 
-        // Ambil data jumlah antrean 7 hari terakhir dalam 1 query saja
         $antreanSeminggu = Antrean::select(
                 DB::raw('DATE(tanggal) as date'),
                 DB::raw('count(*) as total')
@@ -71,7 +70,7 @@ class AdminController extends Controller
         }
 
         $petugasList = User::where('role', 'PETUGAS')->with('assignedLoket')->get();
-        $layanans    = Layanan::with('loket')->get();
+        $layanans    = Service::with('loket')->get();
 
         return view('admin.dashboard', compact(
             'sesiHariIni', 'totalTiket', 'menunggu', 'selesai', 'dilewati',
@@ -122,13 +121,67 @@ class AdminController extends Controller
         return back()->with('success', $msg);
     }
 
+    // TAMBAH LOKET BARU
+    public function storeLoket(Request $request)
+    {
+        $request->validate([
+            'nama_loket' => 'required|string|max:255',
+            'status'     => 'required|in:ACTIVE,INACTIVE',
+        ]);
+
+        Loket::create([
+            'nama_loket' => $request->nama_loket,
+            'status'     => $request->status,
+        ]);
+
+        return redirect()->back()->with('success', 'Loket baru berhasil ditambahkan!');
+    }
+
+    // UPDATE DATA LOKET & PETUGAS SEKALIGUS
+    public function updateLoket(Request $request, $loketId)
+    {
+        $request->validate([
+            'nama_loket'        => 'required|string|max:255',
+            'status'            => 'required|in:ACTIVE,INACTIVE',
+            'active_petugas_id' => 'nullable|exists:users,id',
+        ]);
+
+        $loket        = Loket::findOrFail($loketId);
+        $newPetugasId = $request->active_petugas_id;
+        $oldPetugasId = $loket->active_petugas_id;
+
+        DB::transaction(function () use ($loket, $request, $newPetugasId, $oldPetugasId, $loketId) {
+            // 1. Lepas assigned_loket_id dari petugas lama jika ada
+            if ($oldPetugasId && $oldPetugasId != $newPetugasId) {
+                User::where('id', $oldPetugasId)->update(['assigned_loket_id' => null]);
+            }
+
+            // 2. Lepas petugas lain yang sebelumnya memegang loket ini
+            User::where('assigned_loket_id', $loketId)->update(['assigned_loket_id' => null]);
+
+            // 3. Update data loket
+            $loket->update([
+                'nama_loket'        => $request->nama_loket,
+                'status'            => $request->status,
+                'active_petugas_id' => $newPetugasId,
+            ]);
+
+            // 4. Update assigned_loket_id di tabel users untuk petugas baru
+            if ($newPetugasId) {
+                User::where('id', $newPetugasId)->update(['assigned_loket_id' => $loketId]);
+            }
+        });
+
+        return redirect()->back()->with('success', 'Data loket berhasil diperbarui!');
+    }
+
     // HALAMAN MANAJEMEN PETUGAS
     public function indexPetugas()
     {
         $petugasList = User::where('role', 'PETUGAS')->with('assignedLoket')->get();
         $lokets      = Loket::all();
 
-        return view('admin.petugas.index', compact('petugasList', 'lokets'));
+        return view('admin.petugas', compact('petugasList', 'lokets'));
     }
 
     // CRUD PETUGAS
@@ -136,18 +189,43 @@ class AdminController extends Controller
     {
         $request->validate([
             'name'     => 'required|string|max:255',
-            'email'    => 'required|email|unique:users,email',
+            'username' => 'required|string|max:255|unique:users,email', 
             'password' => 'required|string|min:6',
         ]);
 
         User::create([
             'name'     => $request->name,
-            'email'    => $request->email,
+            'email'    => $request->username, 
             'password' => Hash::make($request->password),
             'role'     => 'PETUGAS',
         ]);
 
         return redirect()->back()->with('success', 'Akun petugas baru berhasil ditambahkan!');
+    }
+
+    // UPDATE AKUN PETUGAS
+    public function updateAkunPetugas(Request $request, $id)
+    {
+        $user = User::where('role', 'PETUGAS')->findOrFail($id);
+
+        $request->validate([
+            'name'     => 'required|string|max:255',
+            'username' => 'required|string|max:255|unique:users,email,' . $id, 
+            'password' => 'nullable|string|min:6',
+        ]);
+
+        $data = [
+            'name'  => $request->name,
+            'email' => $request->username, 
+        ];
+
+        if ($request->filled('password')) {
+            $data['password'] = Hash::make($request->password);
+        }
+
+        $user->update($data);
+
+        return redirect()->back()->with('success', 'Data akun petugas berhasil diperbarui!');
     }
 
     public function destroyPetugas($id)
@@ -159,13 +237,14 @@ class AdminController extends Controller
             'status'            => 'INACTIVE',
             'active_petugas_id' => null
         ]);
-        
+
+        $user->update(['assigned_loket_id' => null]);
         $user->delete();
 
         return redirect()->back()->with('success', 'Akun petugas berhasil dihapus.');
     }
 
-    // PENUGASAN PETUGAS KE LOKET
+    // PENUGASAN PETUGAS KE LOKET (Sinkronisasi dua arah tabel lokets & users)
     public function updatePetugas(Request $request, $loketId)
     {
         $request->validate([
@@ -191,19 +270,22 @@ class AdminController extends Controller
             }
         }
 
-        DB::transaction(function () use ($loket, $newPetugasId, $oldPetugasId) {
-            // Kosongkan penugasan loket lama milik petugas jika ada
+        DB::transaction(function () use ($loket, $newPetugasId, $oldPetugasId, $loketId) {
+            // 1. Lepas assigned_loket_id dari petugas lama jika ada
             if ($oldPetugasId) {
                 User::where('id', $oldPetugasId)->update(['assigned_loket_id' => null]);
             }
 
-            // Update loket
+            // 2. Lepas petugas lain yang mungkin memegang assigned_loket_id ini sebelumnya
+            User::where('assigned_loket_id', $loketId)->update(['assigned_loket_id' => null]);
+
+            // 3. Update tabel lokets
             $loket->update([
                 'active_petugas_id' => $newPetugasId,
                 'status'            => $newPetugasId ? $loket->status : 'INACTIVE',
             ]);
 
-            // Set assigned_loket_id pada petugas baru
+            // 4. Update assigned_loket_id di tabel users untuk petugas baru
             if ($newPetugasId) {
                 User::where('id', $newPetugasId)->update(['assigned_loket_id' => $loket->id]);
             }
@@ -212,74 +294,106 @@ class AdminController extends Controller
         return redirect()->back()->with('success', 'Penugasan petugas pada loket berhasil diperbarui!');
     }
 
-    // Menyimpan Layanan Baru
-    public function storeLayanan(Request $request)
-    {
-        $request->validate([
-            'nama_layanan' => 'required|string|max:255',
-            'loket_id'     => 'required|exists:loket,id',
-            'deskripsi'    => 'nullable|string',
-        ]);
-
-        Layanan::create($request->all());
-
-        return back()->with('success', 'Layanan berhasil ditambahkan!');
-    }
-
-    // Menghapus Layanan
-    public function destroyLayanan($id)
-    {
-        $layanan = Layanan::findOrFail($id);
-        $layanan->delete();
-
-        return back()->with('success', 'Layanan berhasil dihapus!');
-    }
-
     public function destroyLoket($id)
     {
         $loket = Loket::findOrFail($id);
+        
+        // Lepas relasi petugas yang terikat dengan loket ini
+        User::where('assigned_loket_id', $id)->update(['assigned_loket_id' => null]);
+
         $loket->delete();
 
         return redirect()->back()->with('success', 'Data loket berhasil dihapus!');
     }
 
     // HALAMAN MANAJEMEN LAYANAN
-    public function indexLayanan()
+    public function indexLayanan(Request $request)
     {
-        $layanans = Layanan::with('loket')->get();
-        $lokets   = Loket::all();
+        $lokets = Loket::all();
 
-        return view('admin.layanan', compact('layanans', 'lokets'));
-    }
+        $query = Service::with('loket');
 
-    // REKAP DENGAN FILTER
-    public function indexRekap(Request $request)
-    {
-        $query = Antrean::with(['layanan', 'loket', 'petugas']);
-
-        // Filter Search (Nama Mahasiswa)
         if ($request->filled('search')) {
-            $query->where('nama_mahasiswa', 'like', '%' . $request->search . '%');
+            $query->where('nama_layanan', 'like', '%' . $request->search . '%');
         }
 
-        // Filter Loket
+        if ($request->filled('loket')) {
+            $query->whereHas('loket', function ($q) use ($request) {
+                $q->where('nama_loket', $request->loket);
+            });
+        }
+
+        $layanan = $query->paginate(5)->withQueryString();
+
+        return view('admin.layanan', compact('layanan', 'lokets'));
+    }
+
+    public function storeLayanan(Request $request)
+    {
+        $request->validate([
+            'nama_layanan' => 'required|string|max:255',
+            'loket_id'     => 'required|exists:loket,id', 
+        ]);
+
+        Service::create([
+            'nama_layanan' => $request->nama_layanan,
+            'loket_id'     => $request->loket_id,
+        ]);
+
+        return back()->with('success', 'Layanan berhasil ditambahkan!');
+    }
+
+    public function updateLayanan(Request $request, $id)
+    {
+        $request->validate([
+            'nama_layanan' => 'required|string|max:255',
+            'loket_id'     => 'required|exists:loket,id',
+        ]);
+
+        $layanan = Service::findOrFail($id);
+        $layanan->update([
+            'nama_layanan' => $request->nama_layanan,
+            'loket_id'     => $request->loket_id,
+        ]);
+
+        return back()->with('success', 'Layanan berhasil diperbarui!');
+    }
+
+    public function destroyLayanan($id)
+    {
+        $layanan = Service::findOrFail($id);
+        $layanan->delete();
+
+        return back()->with('success', 'Layanan berhasil dihapus!');
+    }
+
+    public function indexRekap(Request $request)
+    {
+        // PERBAIKAN: Memuat relasi serviceAwal, serviceAktual, dan loketPelayanan dengan benar
+        $query = Antrean::with(['serviceAwal', 'serviceAktual', 'loketPelayanan', 'petugas']);
+
+        if ($request->filled('search')) {
+            $query->where('nama', 'like', '%' . $request->search . '%');
+        }
+
         if ($request->filled('loket_id')) {
             $query->where('loket_pelayanan_id', $request->loket_id);
         }
 
-        // Filter Layanan
         if ($request->filled('layanan_id')) {
-            $query->where('layanan_id', $request->layanan_id);
+            $query->where(function($q) use ($request) {
+                $q->where('service_awal_id', $request->layanan_id)
+                  ->orWhere('service_aktual_id', $request->layanan_id);
+            });
         }
 
-        // Filter Rentang Tanggal
         if ($request->filled('start_date') && $request->filled('end_date')) {
             $query->whereBetween('tanggal', [$request->start_date, $request->end_date]);
         }
 
         $antreans = $query->latest()->get();
-        $lokets   = Loket::all();
-        $layanans = Layanan::all();
+        $lokets   = Loket::all();      
+        $layanans = Service::all();
 
         return view('admin.rekap', compact('antreans', 'lokets', 'layanans'));
     }
@@ -290,7 +404,8 @@ class AdminController extends Controller
         $startDate = $request->input('start_date', now()->startOfMonth()->toDateString());
         $endDate   = $request->input('end_date', now()->toDateString());
 
-        $antreans = Antrean::with(['layanan', 'loket', 'petugas'])
+        // PERBAIKAN: Menggunakan 'loketPelayanan' menggantikan 'loket'
+        $antreans = Antrean::with(['layanan', 'loketPelayanan', 'petugas'])
             ->whereBetween('tanggal', [$startDate, $endDate])
             ->get()
             ->groupBy('tanggal');
@@ -300,13 +415,12 @@ class AdminController extends Controller
         }
 
         $spreadsheet = new Spreadsheet();
-        $spreadsheet->removeSheetByIndex(0); // Hapus sheet default
+        $spreadsheet->removeSheetByIndex(0);
 
         foreach ($antreans as $tanggal => $items) {
             $sheet = $spreadsheet->createSheet();
             $sheet->setTitle(Carbon::parse($tanggal)->format('d-m-Y'));
 
-            // Header Kolom
             $headers = [
                 'No', 'Tanggal', 'Nama/Identitas Pelapor', 'Status Pelapor',
                 'Jenis Keluhan', 'Subjek/Uraian Keluhan', 'Media Penyampaian',
@@ -316,11 +430,10 @@ class AdminController extends Controller
 
             $sheet->fromArray($headers, NULL, 'A1');
 
-            // Style Header
             $sheet->getStyle('A1:N1')->getFont()->setBold(true);
             $sheet->getStyle('A1:N1')->getFill()
                 ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
-                ->getStartColor()->setARGB('001F3F'); // Dark Blue
+                ->getStartColor()->setARGB('001F3F');
             $sheet->getStyle('A1:N1')->getFont()->getColor()->setARGB('FFFFFF');
 
             $row = 2;
@@ -333,7 +446,8 @@ class AdminController extends Controller
                 $sheet->setCellValue('E' . $row, $item->layanan->nama_layanan ?? '-');
                 $sheet->setCellValue('F' . $row, 'Pelayanan Antrean ' . ($item->layanan->nama_layanan ?? ''));
                 $sheet->setCellValue('G' . $row, 'Tatapmuka/Kiosk');
-                $sheet->setCellValue('H' . $row, $item->loket->nama_loket ?? '-');
+                // PERBAIKAN: Mengambil nama dari relasi 'loketPelayanan'
+                $sheet->setCellValue('H' . $row, $item->loketPelayanan->nama_loket ?? '-');
                 $sheet->setCellValue('I' . $row, 'Telah dilayani di loket');
                 $sheet->setCellValue('J' . $row, $item->status == 'DONE' ? 'Selesai' : $item->status);
                 $sheet->setCellValue('K' . $row, Carbon::parse($item->updated_at)->format('d/m/Y'));
@@ -343,8 +457,11 @@ class AdminController extends Controller
                 $row++;
             }
 
-            // GRAFIK DI EXCEL (Bar Chart Pengunjung Per Loket Hari Itu)
-            $loketCounts   = $items->groupBy('loket.nama_loket')->map->count();
+            // PERBAIKAN: Mengelompokkan berdasarkan 'loketPelayanan.nama_loket'
+            $loketCounts   = $items->groupBy(function($item) {
+                return $item->loketPelayanan->nama_loket ?? 'Umum';
+            })->map->count();
+
             $chartStartRow = $row + 3;
             $sheet->setCellValue('P' . $chartStartRow, 'Loket');
             $sheet->setCellValue('Q' . $chartStartRow, 'Jumlah');
