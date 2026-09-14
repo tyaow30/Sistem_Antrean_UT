@@ -11,6 +11,7 @@ class Loket extends Model
     use HasFactory;
 
     protected $table = 'loket';
+    protected $guarded = ['id'];
 
     protected $fillable = [
         'gerai_id',
@@ -39,6 +40,11 @@ class Loket extends Model
     public function antrean()
     {
         return $this->hasMany(Antrean::class, 'loket_asal_id');
+    }
+
+    public function antreans()
+    {
+        return $this->hasMany(Antrean::class, 'loket_pelayanan_id'); 
     }
 
     public function antreanDilayani()

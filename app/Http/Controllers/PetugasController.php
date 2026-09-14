@@ -34,7 +34,7 @@ class PetugasController extends Controller
 
         // 3. Antrean yang sedang diintip (PREPARING) / dipanggil (CALLED) / dilayani (SERVING)
         $antreanSaatIni = Antrean::where('tanggal', $today)
-            ->where('petugas_id', $user->id)
+            ->where('loket_pelayanan_id', $loket->id)
             ->whereIn('status', ['PREPARING', 'CALLED', 'SERVING'])
             ->first();
 
@@ -61,8 +61,11 @@ class PetugasController extends Controller
         // 7. Antrean Bantuan dari loket lain (Yang loket pelayanannya bukan milik dia, dan status masih waiting di loket asalnya)
         $daftarAntreanBantuan = collect();
         if (!$adaAntreanSendiri || !$adaPetugasLainAktif) {
+            $layananLoketIds = \App\Models\Service::where('loket_id', $loket->id)->pluck('id');
+
             $daftarAntreanBantuan = Antrean::where('tanggal', $today)
-                ->where('loket_pelayanan_id', '!=', $user->assigned_loket_id)
+                ->where('loket_pelayanan_id', '!=', $loket->id)
+                ->whereIn('service_awal_id', $layananLoketIds)
                 ->where('status', 'WAITING')
                 ->orderBy('id', 'asc')
                 ->get();
@@ -119,8 +122,10 @@ class PetugasController extends Controller
         $user = auth()->user();
         $today = now()->toDateString();
 
+        $loket = Loket::find($user->assigned_loket_id);
+
         $sedangDilayani = Antrean::where('tanggal', $today)
-            ->where('petugas_id', $user->id)
+            ->where('loket_pelayanan_id', $loket->id)
             ->whereIn('status', ['PREPARING', 'CALLED', 'SERVING'])
             ->exists();
 
@@ -171,7 +176,7 @@ class PetugasController extends Controller
 
         $antrean = DB::transaction(function () use ($id, $today, $user, $loket) {
             $sedangDilayani = Antrean::where('tanggal', $today)
-                ->where('petugas_id', $user->id)
+                ->where('loket_pelayanan_id', $loket->id)
                 ->whereIn('status', ['PREPARING', 'CALLED', 'SERVING'])
                 ->lockForUpdate()
                 ->exists();
@@ -213,9 +218,11 @@ class PetugasController extends Controller
         $user = auth()->user();
         $today = now()->toDateString();
 
+        $loket = Loket::find($user->assigned_loket_id);
+
         $antrean = Antrean::where('id', $id)
             ->where('tanggal', $today)
-            ->where('petugas_id', $user->id)
+            ->where('loket_pelayanan_id', $loket->id)
             ->where('status', 'PREPARING')
             ->first();
 
@@ -253,10 +260,12 @@ class PetugasController extends Controller
 
         $today = now()->toDateString();
 
-        $antrean = DB::transaction(function () use ($id, $today, $user) {
+        $loket = Loket::find($user->assigned_loket_id);
+
+        $antrean = DB::transaction(function () use ($id, $today, $user, $loket) {
             $antrean = Antrean::where('id', $id)
                 ->where('tanggal', $today)
-                ->where('petugas_id', $user->id)
+                ->where('loket_pelayanan_id', $loket->id)
                 ->whereIn('status', ['CALLED', 'SERVING'])
                 ->lockForUpdate()
                 ->first();
@@ -287,9 +296,11 @@ class PetugasController extends Controller
         $user = auth()->user();
         $today = now()->toDateString();
 
+        $loket = Loket::find($user->assigned_loket_id);
+
         $antrean = Antrean::where('id', $id)
             ->where('tanggal', $today)
-            ->where('petugas_id', $user->id)
+            ->where('loket_pelayanan_id', $loket->id)
             ->first();
 
         if (!$antrean) {
@@ -312,7 +323,7 @@ class PetugasController extends Controller
 
         $antrean = Antrean::where('id', $id)
             ->where('tanggal', $today)
-            ->where('petugas_id', $user->id)
+            ->where('loket_pelayanan_id', $loket->id)
             ->first();
 
         if (!$antrean) {
@@ -339,7 +350,7 @@ class PetugasController extends Controller
 
         $antrean = Antrean::where('id', $id)
             ->where('tanggal', $today)
-            ->where('petugas_id', $user->id)
+            ->where('loket_pelayanan_id', $loket->id)
             ->first();
 
         if (!$antrean) {
@@ -378,7 +389,7 @@ class PetugasController extends Controller
 
         $antrean = Antrean::where('id', $id)
             ->where('tanggal', $today)
-            ->where('petugas_id', $user->id)
+            ->where('loket_pelayanan_id', $loket->id)
             ->whereIn('status', ['PREPARING', 'CALLED', 'SERVING'])
             ->first();
 
@@ -414,7 +425,7 @@ class PetugasController extends Controller
         $tanggalSelesai = $request->input('tanggal_selesai', now()->toDateString());
         $keyword = $request->input('keyword');
 
-        $query = Antrean::where('petugas_id', $user->id)
+        $query = Antrean::where('loket_pelayanan_id', $loket->id)
             ->whereBetween('tanggal', [$tanggalMulai, $tanggalSelesai]);
 
         if (!empty($keyword)) {

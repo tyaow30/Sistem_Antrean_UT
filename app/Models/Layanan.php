@@ -9,7 +9,7 @@ class Layanan extends Model
 {
     use HasFactory;
 
-    protected $table = 'layanans';
+    protected $table = 'services';
     protected $fillable = ['loket_id', 'nama_layanan', 'deskripsi'];
 
     // Relasi One-to-Many ke Loket (karena ada kolom loket_id di tabel layanans)

@@ -11,8 +11,8 @@ use App\Http\Controllers\LoketController;
 // =========================================================
 // KIOSK ROUTES (Single Page: Form & Pilih Loket Jadi Satu)
 // =========================================================
-Route::get('/', [KioskController::class, 'index'])->name('kiosk.index');
-Route::get('/kiosk', [KioskController::class, 'index']);
+Route::get('/', [KioskController::class, 'welcome'])->name('kiosk.welcome');
+Route::get('/kiosk/form', [KioskController::class, 'index'])->name('kiosk.index');
 Route::post('/kiosk/cetak', [KioskController::class, 'cetakTiket'])->name('kiosk.cetak');
 Route::get('/kiosk/tiket/{id}', [KioskController::class, 'previewTiket'])->name('kiosk.tiket.preview');
 Route::post('/kiosk/tiket/{id}/confirm', [KioskController::class, 'confirmCetak'])->name('kiosk.tiket.confirm');
