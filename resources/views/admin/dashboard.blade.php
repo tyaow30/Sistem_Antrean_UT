@@ -1,6 +1,27 @@
 @extends('layouts.admin')
 
 @section('content')
+<!-- NOTIFIKASI / ALERT SUKSES / GAGAL -->
+@if(session('success'))
+    <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" class="mb-6 bg-green-500 text-white font-bold px-6 py-4 rounded-2xl shadow-lg flex items-center justify-between transition-all duration-300">
+        <div class="flex items-center space-x-3">
+            <svg class="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            <span>{{ session('success') }}</span>
+        </div>
+        <button @click="show = false" class="text-white hover:text-gray-200 font-bold text-lg">&times;</button>
+    </div>
+@endif
+
+@if(session('error'))
+    <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" class="mb-6 bg-red-500 text-white font-bold px-6 py-4 rounded-2xl shadow-lg flex items-center justify-between transition-all duration-300">
+        <div class="flex items-center space-x-3">
+            <svg class="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            <span>{{ session('error') }}</span>
+        </div>
+        <button @click="show = false" class="text-white hover:text-gray-200 font-bold text-lg">&times;</button>
+    </div>
+@endif
+
 <!-- BANNER KUNING -->
 <div class="bg-[#FDE047] p-6 rounded-3xl shadow-sm mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
     <div>
@@ -13,7 +34,6 @@
         <button type="submit" class="{{ ($sesiHariIni && $sesiHariIni->is_open) ? 'bg-[#EF4444] hover:bg-red-600' : 'bg-[#22C55E] hover:bg-green-600' }} text-white font-extrabold px-6 py-3.5 rounded-2xl shadow-md transition text-sm tracking-wide">
             {{ ($sesiHariIni && $sesiHariIni->is_open) ? 'TUTUP SESI HARI INI' : 'BUKA SESI HARI INI' }}
         </button>
-    </form>
     </form>
 </div>
 
@@ -56,23 +76,29 @@
     </div>
 </div>
 
+{{-- Deklarasi variabel PHP ditaruh di luar script agar linter VS Code tidak error/merah --}}
+@php
+    $semingguLabels = $chartSemingguLabels ?? ['31/8/26', '1/9/26', '2/9/26', '3/9/26', '4/9/26', '5/9/26', '6/9/26'];
+    $semingguData = $chartSemingguData ?? [0,0,0,0,0,0,0];
+    $loketLabels = $chartLoketLabels ?? ['LOKET 1', 'LOKET 2', 'LOKET 3', 'LOKET 4'];
+    $loketData = $chartLoketData ?? [0,0,0,0];
+@endphp
+
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        // Simpan data ke variabel PHP dulu sebelum di-json_encode
-        @php
-            $defaultSemingguLabels = ['31/8/26', '1/9/26', '2/9/26', '3/9/26', '4/9/26', '5/9/26', '6/9/26'];
-            $defaultSemingguData = [0,0,0,0,0,0,0];
-            $defaultLoketLabels = ['LOKET 1', 'LOKET 2', 'LOKET 3', 'LOKET 4'];
-            $defaultLoketData = [0,0,0,0];
-        @endphp
+        // Ambil data dari PHP yang di-passing aman ke variabel JS
+        const labelsSeminggu = {!! json_encode($semingguLabels) !!};
+        const dataSeminggu = {!! json_encode($semingguData) !!};
+        const labelsLoket = {!! json_encode($loketLabels) !!};
+        const dataLoket = {!! json_encode($loketData) !!};
 
         // Chart 1: Statistik Antrean Seminggu
         new Chart(document.getElementById('chartSeminggu'), {
             type: 'bar',
             data: {
-                labels: {!! json_encode($chartSemingguLabels ?? $defaultSemingguLabels) !!},
+                labels: labelsSeminggu,
                 datasets: [{
-                    data: {!! json_encode($chartSemingguData ?? $defaultSemingguData) !!},
+                    data: dataSeminggu,
                     backgroundColor: '#3B82F6',
                     borderRadius: 6
                 }]
@@ -83,7 +109,10 @@
                 plugins: { legend: { display: false } },
                 scales: {
                     x: { ticks: { color: '#FFFFFF', font: { weight: 'bold' } }, grid: { display: false } },
-                    y: { ticks: { color: '#FFFFFF' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } }
+                    y: { 
+                        ticks: { color: '#FFFFFF' }, 
+                        grid: { color: 'rgba(250, 204, 21, 0.25)' } 
+                    }
                 }
             }
         });
@@ -92,9 +121,9 @@
         new Chart(document.getElementById('chartLoket'), {
             type: 'bar',
             data: {
-                labels: {!! json_encode($chartLoketLabels ?? $defaultLoketLabels) !!},
+                labels: labelsLoket,
                 datasets: [{
-                    data: {!! json_encode($chartLoketData ?? $defaultLoketData) !!},
+                    data: dataLoket,
                     backgroundColor: '#0B3B82',
                     borderRadius: 6
                 }]
@@ -105,7 +134,10 @@
                 plugins: { legend: { display: false } },
                 scales: {
                     x: { ticks: { color: '#FFFFFF', font: { weight: 'bold' } }, grid: { display: false } },
-                    y: { ticks: { color: '#FFFFFF' }, grid: { display: false } }
+                    y: { 
+                        ticks: { color: '#FFFFFF' }, 
+                        grid: { color: 'rgba(250, 204, 21, 0.25)' } 
+                    }
                 }
             }
         });

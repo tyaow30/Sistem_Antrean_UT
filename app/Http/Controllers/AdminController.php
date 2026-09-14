@@ -369,7 +369,6 @@ class AdminController extends Controller
 
     public function indexRekap(Request $request)
     {
-        // PERBAIKAN: Memuat relasi serviceAwal, serviceAktual, dan loketPelayanan dengan benar
         $query = Antrean::with(['serviceAwal', 'serviceAktual', 'loketPelayanan', 'petugas']);
 
         if ($request->filled('search')) {
@@ -398,28 +397,176 @@ class AdminController extends Controller
         return view('admin.rekap', compact('antreans', 'lokets', 'layanans'));
     }
 
-    // EXPORT EXCEL MULTI-SHEET & CHART
     public function exportRekapExcel(Request $request)
     {
-        $startDate = $request->input('start_date', now()->startOfMonth()->toDateString());
-        $endDate   = $request->input('end_date', now()->toDateString());
+        // Menyesuaikan dengan form input start_date & end_date di Blade kamu
+        $startDate = $request->input('start_date', date('Y-m-d'));
+        $endDate   = $request->input('end_date', date('Y-m-d'));
 
-        // PERBAIKAN: Menggunakan 'loketPelayanan' menggantikan 'loket'
-        $antreans = Antrean::with(['layanan', 'loketPelayanan', 'petugas'])
+        // Ambil data antrean sesuai rentang tanggal yang dipilih di filter
+        $antreans = Antrean::with(['serviceAwal', 'serviceAktual', 'loketPelayanan', 'petugas'])
             ->whereBetween('tanggal', [$startDate, $endDate])
-            ->get()
-            ->groupBy('tanggal');
+            ->get();
 
         if ($antreans->isEmpty()) {
             return back()->with('error', 'Tidak ada data antrean pada rentang tanggal tersebut.');
         }
 
         $spreadsheet = new Spreadsheet();
-        $spreadsheet->removeSheetByIndex(0);
+        $spreadsheet->removeSheetByIndex(0); // Hapus sheet default bawaan
 
-        foreach ($antreans as $tanggal => $items) {
-            $sheet = $spreadsheet->createSheet();
-            $sheet->setTitle(Carbon::parse($tanggal)->format('d-m-Y'));
+        // ==========================================
+        // 1. SHEET DASHBOARD & CHART (DI DEPAN)
+        // ==========================================
+        $sheetDash = $spreadsheet->createSheet(0);
+        $sheetDash->setTitle('Dashboard');
+
+        // Judul Dashboard
+        $sheetDash->setCellValue('A1', 'DASHBOARD REKAPITULASI PELAYANAN ANTREAN');
+        $sheetDash->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+
+        // Hitung Statistik Ringkasan
+        $totalKeluhan  = $antreans->count();
+        $totalSelesai  = $antreans->where('status', 'DONE')->count();
+        $totalProses   = $antreans->where('status', 'WAITING')->count();
+        $totalBatal    = $antreans->whereNotIn('status', ['DONE', 'WAITING'])->count();
+        $persenSelesai = $totalKeluhan > 0 ? round(($totalSelesai / $totalKeluhan) * 100, 1) . '%' : '0%';
+
+        // Tabel Ringkasan Kartu Statistik (Kiri Atas)
+        $sheetDash->setCellValue('A3', 'Total Pengunjung');      $sheetDash->setCellValue('B3', $totalKeluhan);
+        $sheetDash->setCellValue('A4', 'Selesai');                $sheetDash->setCellValue('B4', $totalSelesai);
+        $sheetDash->setCellValue('A5', 'Dalam Proses (Waiting)'); $sheetDash->setCellValue('B5', $totalProses);
+        $sheetDash->setCellValue('A6', 'Belum Selesai / Batal');  $sheetDash->setCellValue('B6', $totalBatal);
+        $sheetDash->setCellValue('A7', '% Penyelesaian');         $sheetDash->setCellValue('B7', $persenSelesai);
+
+
+        // --- KUMPULKAN DATA UNTUK CHART ---
+        // A. Pengunjung Per Hari (Sesuai rentang tanggal yang di-filter)
+        $period = \Carbon\CarbonPeriod::create($startDate, $endDate);
+        $dataPerHari = [];
+        foreach ($period as $date) {
+            $tglStr = $date->format('Y-m-d');
+            $tglLabel = $date->format('d-m-Y');
+            $dataPerHari[$tglLabel] = $antreans->where('tanggal', $tglStr)->count();
+        }
+
+        // B. Pengunjung Per Loket
+        $dataPerLoket = $antreans->groupBy(function($item) {
+            return $item->loketPelayanan->nama_loket ?? 'Umum';
+        })->map->count();
+
+        // C. Status Penyelesaian
+        $dataStatus = [
+            'Selesai' => $totalSelesai,
+            'Dalam Proses' => $totalProses,
+            'Belum Selesai/Batal' => $totalBatal
+        ];
+
+
+        // --- MASUKKAN DATA PENDUKUNG CHART KE KOLOM TERSEMBUNYI ---
+        // 1. Data Chart Harian (Kolom P & Q)
+        $r = 3;
+        $sheetDash->setCellValue('P2', 'Tanggal'); $sheetDash->setCellValue('Q2', 'Jumlah');
+        foreach ($dataPerHari as $tgl => $jml) {
+            $sheetDash->setCellValue('P' . $r, $tgl);
+            $sheetDash->setCellValue('Q' . $r, $jml);
+            $r++;
+        }
+        $endHariRow = $r - 1;
+
+        // 2. Data Chart Loket (Kolom S & T)
+        $r = 3;
+        $sheetDash->setCellValue('S2', 'Loket'); $sheetDash->setCellValue('T2', 'Jumlah');
+        foreach ($dataPerLoket as $loket => $jml) {
+            $sheetDash->setCellValue('S' . $r, $loket);
+            $sheetDash->setCellValue('T' . $r, $jml);
+            $r++;
+        }
+        $endLoketRow = $r - 1;
+
+        // 3. Data Chart Status (Kolom V & W)
+        $r = 3;
+        $sheetDash->setCellValue('V2', 'Status'); $sheetDash->setCellValue('W2', 'Jumlah');
+        foreach ($dataStatus as $status => $jml) {
+            $sheetDash->setCellValue('V' . $r, $status);
+            $sheetDash->setCellValue('W' . $r, $jml);
+            $r++;
+        }
+        $endStatusRow = $r - 1;
+
+
+        // --- BUAT 6 CHART & TEMPEL DI SHEET DASHBOARD ---
+        
+        if (count($dataPerHari) > 0) {
+            $catHari = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'Dashboard'!\$P\$3:\$P\${$endHariRow}", null, count($dataPerHari))];
+            $valHari = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'Dashboard'!\$Q\$3:\$Q\${$endHariRow}", null, count($dataPerHari))];
+            
+            // 1. Chart Pengunjung Tiap Hari (Bar Chart)
+            $serHariBar = new DataSeries(DataSeries::TYPE_BARCHART, DataSeries::GROUPING_STANDARD, range(0, count($valHari)-1), [], $catHari, $valHari);
+            $pltHariBar = new PlotArea(null, [$serHariBar]);
+            $chtHariBar = new Chart('chart_hari_bar', new Title('Pengunjung Tiap Hari (Bar Chart)'), new Legend(Legend::POSITION_RIGHT, null, false), $pltHariBar);
+            $chtHariBar->setTopLeftPosition('D3');
+            $chtHariBar->setBottomRightPosition('K14');
+            $sheetDash->addChart($chtHariBar);
+
+            // 2. Chart Pengunjung Tiap Hari (Pie Chart)
+            $serHariPie = new DataSeries(DataSeries::TYPE_PIECHART, DataSeries::GROUPING_STANDARD, range(0, count($valHari)-1), [], $catHari, $valHari);
+            $pltHariPie = new PlotArea(null, [$serHariPie]);
+            $chtHariPie = new Chart('chart_hari_pie', new Title('Pengunjung Tiap Hari (Pie Chart)'), new Legend(Legend::POSITION_RIGHT, null, false), $pltHariPie);
+            $chtHariPie->setTopLeftPosition('D16');
+            $chtHariPie->setBottomRightPosition('K27');
+            $sheetDash->addChart($chtHariPie);
+        }
+
+        if ($dataPerLoket->count() > 0) {
+            $catLoket = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'Dashboard'!\$S\$3:\$S\${$endLoketRow}", null, count($dataPerLoket))];
+            $valLoket = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'Dashboard'!\$T\$3:\$T\${$endLoketRow}", null, count($dataPerLoket))];
+            
+            // 3. Chart Pengunjung Tiap Loket (Bar Chart)
+            $serLoketBar = new DataSeries(DataSeries::TYPE_BARCHART, DataSeries::GROUPING_STANDARD, range(0, count($valLoket)-1), [], $catLoket, $valLoket);
+            $pltLoketBar = new PlotArea(null, [$serLoketBar]);
+            $chtLoketBar = new Chart('chart_loket_bar', new Title('Pengunjung Tiap Loket (Bar Chart)'), new Legend(Legend::POSITION_RIGHT, null, false), $pltLoketBar);
+            $chtLoketBar->setTopLeftPosition('D29');
+            $chtLoketBar->setBottomRightPosition('K40');
+            $sheetDash->addChart($chtLoketBar);
+
+            // 4. Chart Pengunjung Tiap Loket (Pie Chart)
+            $serLoketPie = new DataSeries(DataSeries::TYPE_PIECHART, DataSeries::GROUPING_STANDARD, range(0, count($valLoket)-1), [], $catLoket, $valLoket);
+            $pltLoketPie = new PlotArea(null, [$serLoketPie]);
+            $chtLoketPie = new Chart('chart_loket_pie', new Title('Pengunjung Tiap Loket (Pie Chart)'), new Legend(Legend::POSITION_RIGHT, null, false), $pltLoketPie);
+            $chtLoketPie->setTopLeftPosition('D42');
+            $chtLoketPie->setBottomRightPosition('K53');
+            $sheetDash->addChart($chtLoketPie);
+        }
+
+        $catStatus = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'Dashboard'!\$V\$3:\$V\${$endStatusRow}", null, count($dataStatus))];
+        $valStatus = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'Dashboard'!\$W\$3:\$W\${$endStatusRow}", null, count($dataStatus))];
+        
+        // 5. Chart Status Penyelesaian (Bar Chart)
+        $serStatusBar = new DataSeries(DataSeries::TYPE_BARCHART, DataSeries::GROUPING_STANDARD, range(0, count($valStatus)-1), [], $catStatus, $valStatus);
+        $pltStatusBar = new PlotArea(null, [$serStatusBar]);
+        $chtStatusBar = new Chart('chart_status_bar', new Title('Status Penyelesaian (Bar Chart)'), new Legend(Legend::POSITION_RIGHT, null, false), $pltStatusBar);
+        $chtStatusBar->setTopLeftPosition('D55');
+        $chtStatusBar->setBottomRightPosition('K66');
+        $sheetDash->addChart($chtStatusBar);
+
+        // 6. Chart Status Penyelesaian (Pie Chart)
+        $serStatusPie = new DataSeries(DataSeries::TYPE_PIECHART, DataSeries::GROUPING_STANDARD, range(0, count($valStatus)-1), [], $catStatus, $valStatus);
+        $pltStatusPie = new PlotArea(null, [$serStatusPie]);
+        $chtStatusPie = new Chart('chart_status_pie', new Title('Status Penyelesaian (Pie Chart)'), new Legend(Legend::POSITION_RIGHT, null, false), $pltStatusPie);
+        $chtStatusPie->setTopLeftPosition('D68');
+        $chtStatusPie->setBottomRightPosition('K79');
+        $sheetDash->addChart($chtStatusPie);
+
+
+        // ==========================================
+        // 2. SHEET REKAPITULASI PER TANGGAL (MULTI-SHEET)
+        // ==========================================
+        $groupedByDate = $antreans->groupBy('tanggal');
+
+        foreach ($groupedByDate as $tanggal => $items) {
+            $sheetData = $spreadsheet->createSheet();
+            $sheetData->setTitle(Carbon::parse($tanggal)->format('d-m-Y'));
 
             $headers = [
                 'No', 'Tanggal', 'Nama/Identitas Pelapor', 'Status Pelapor',
@@ -428,78 +575,52 @@ class AdminController extends Controller
                 'Tanggal Selesai', 'Lama Penyelesaian (Hari)', 'Kepuasan Setelah Penyelesaian', 'Keterangan'
             ];
 
-            $sheet->fromArray($headers, NULL, 'A1');
+            $sheetData->fromArray($headers, NULL, 'A1');
 
-            $sheet->getStyle('A1:N1')->getFont()->setBold(true);
-            $sheet->getStyle('A1:N1')->getFill()
+            // Styling Header Table
+            $sheetData->getStyle('A1:N1')->getFont()->setBold(true);
+            $sheetData->getStyle('A1:N1')->getFill()
                 ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
                 ->getStartColor()->setARGB('001F3F');
-            $sheet->getStyle('A1:N1')->getFont()->getColor()->setARGB('FFFFFF');
+            $sheetData->getStyle('A1:N1')->getFont()->getColor()->setARGB('FFFFFF');
+
+            // Aktifkan Filter (Dropdown) pada Header Tabel
+            $lastRowData = count($items) + 1;
+            $sheetData->setAutoFilter("A1:N{$lastRowData}");
 
             $row = 2;
             $no  = 1;
             foreach ($items as $item) {
-                $sheet->setCellValue('A' . $row, $no++);
-                $sheet->setCellValue('B' . $row, Carbon::parse($item->tanggal)->format('d/m/Y'));
-                $sheet->setCellValue('C' . $row, $item->nama_mahasiswa ?? 'Mahasiswa');
-                $sheet->setCellValue('D' . $row, 'Mahasiswa');
-                $sheet->setCellValue('E' . $row, $item->layanan->nama_layanan ?? '-');
-                $sheet->setCellValue('F' . $row, 'Pelayanan Antrean ' . ($item->layanan->nama_layanan ?? ''));
-                $sheet->setCellValue('G' . $row, 'Tatapmuka/Kiosk');
-                // PERBAIKAN: Mengambil nama dari relasi 'loketPelayanan'
-                $sheet->setCellValue('H' . $row, $item->loketPelayanan->nama_loket ?? '-');
-                $sheet->setCellValue('I' . $row, 'Telah dilayani di loket');
-                $sheet->setCellValue('J' . $row, $item->status == 'DONE' ? 'Selesai' : $item->status);
-                $sheet->setCellValue('K' . $row, Carbon::parse($item->updated_at)->format('d/m/Y'));
-                $sheet->setCellValue('L' . $row, 0);
-                $sheet->setCellValue('M' . $row, 'Puas');
-                $sheet->setCellValue('N' . $row, 'Data Antrean Sistem');
+                $namaLayanan   = $item->serviceAwal->nama_layanan ?? ($item->serviceAktual->nama_layanan ?? '-');
+                $statusSelesai = $item->status == 'DONE' ? 'Selesai' : ($item->status == 'WAITING' ? 'Dalam Proses' : 'Belum Selesai/Batal');
+                $tglSelesai    = $item->status == 'DONE' ? Carbon::parse($item->updated_at)->format('d/m/Y') : '';
+
+                $sheetData->setCellValue('A' . $row, $no++);
+                $sheetData->setCellValue('B' . $row, Carbon::parse($item->tanggal)->format('d/m/Y'));
+                $sheetData->setCellValue('C' . $row, $item->nama ?? 'Mahasiswa');
+                $sheetData->setCellValue('D' . $row, 'Mahasiswa');
+                $sheetData->setCellValue('E' . $row, $namaLayanan);
+                $sheetData->setCellValue('F' . $row, 'Pelayanan Antrean ' . $namaLayanan);
+                $sheetData->setCellValue('G' . $row, 'Tatapmuka/Kiosk');
+                $sheetData->setCellValue('H' . $row, $item->loketPelayanan->nama_loket ?? '-');
+                $sheetData->setCellValue('I' . $row, 'Telah dilayani di loket');
+                $sheetData->setCellValue('J' . $row, $statusSelesai);
+                $sheetData->setCellValue('K' . $row, $tglSelesai);
+                $sheetData->setCellValue('L' . $row, 0);
+                $sheetData->setCellValue('M' . $row, 'Puas');
+                $sheetData->setCellValue('N' . $row, 'Data Antrean Sistem');
                 $row++;
             }
-
-            // PERBAIKAN: Mengelompokkan berdasarkan 'loketPelayanan.nama_loket'
-            $loketCounts   = $items->groupBy(function($item) {
-                return $item->loketPelayanan->nama_loket ?? 'Umum';
-            })->map->count();
-
-            $chartStartRow = $row + 3;
-            $sheet->setCellValue('P' . $chartStartRow, 'Loket');
-            $sheet->setCellValue('Q' . $chartStartRow, 'Jumlah');
-
-            $r = $chartStartRow + 1;
-            foreach ($loketCounts as $loketName => $count) {
-                $sheet->setCellValue('P' . $r, $loketName ?: 'Umum');
-                $sheet->setCellValue('Q' . $r, $count);
-                $r++;
-            }
-
-            $categories = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'{$sheet->getTitle()}'!\$P\$" . ($chartStartRow + 1) . ":\$P\$" . ($r - 1), null, count($loketCounts))];
-            $values     = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'{$sheet->getTitle()}'!\$Q\$" . ($chartStartRow + 1) . ":\$Q\$" . ($r - 1), null, count($loketCounts))];
-
-            $series = new DataSeries(
-                DataSeries::TYPE_BARCHART,
-                DataSeries::GROUPING_STANDARD,
-                range(0, count($values) - 1),
-                [],
-                $categories,
-                $values
-            );
-
-            $plotArea = new PlotArea(null, [$series]);
-            $legend   = new Legend(Legend::POSITION_RIGHT, null, false);
-            $title    = new Title('Grafik Pengunjung Per Loket (' . $sheet->getTitle() . ')');
-
-            $chart = new Chart('chart_' . str_replace('-', '_', $tanggal), $title, $legend, $plotArea);
-            $chart->setTopLeftPosition('P2');
-            $chart->setBottomRightPosition('AA20');
-
-            $sheet->addChart($chart);
         }
 
+
+        // ==========================================
+        // 3. OUTPUT FILE EXCEL
+        // ==========================================
         $writer = new Xlsx($spreadsheet);
         $writer->setIncludeCharts(true);
 
-        $fileName = 'Rekap_Antrean_' . $startDate . '_s-d_' . $endDate . '.xlsx';
+        $fileName = 'Rekap_Lengkap_Antrean_' . $startDate . '_s-d_' . $endDate . '.xlsx';
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         header('Content-Disposition: attachment;filename="' . $fileName . '"');
         header('Cache-Control: max-age=0');

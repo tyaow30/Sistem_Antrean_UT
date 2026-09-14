@@ -15,7 +15,7 @@
 
     <div class="min-h-screen flex flex-col relative">
 
-        <!-- 1. TOPBAR HEADER (Ukuran & Tinggi Selalu Konsisten) -->
+        <!-- 1. TOPBAR HEADER -->
         <header class="bg-[#0B3B82] text-white h-20 px-4 flex items-center justify-between shadow-md relative z-20 w-full flex-shrink-0">
             <div class="flex items-center space-x-3">
                 <!-- Navigasi Menu Topbar (Hanya muncul saat bukan mode Sidenav) -->
@@ -49,10 +49,10 @@
             </div>
         </header>
 
-        <!-- AREA UTAMA (Sidenavbar + Main Content) -->
+        <!-- AREA UTAMA -->
         <div class="flex-1 flex relative">
 
-            <!-- 2. OVERLAY BACKDROP (Memberi efek redup di belakang Sidenavbar) -->
+            <!-- OVERLAY BACKDROP -->
             <div 
                 x-show="isSidebar" 
                 x-cloak
@@ -66,7 +66,7 @@
                 class="fixed inset-0 bg-black/30 z-30"
             ></div>
 
-            <!-- 3. SIDENAVBAR KUNING (Menutup dari kiri tanpa mengubah dimensi Topbar) -->
+            <!-- SIDENAVBAR KUNING -->
             <aside 
                 x-show="isSidebar" 
                 x-cloak
@@ -87,32 +87,31 @@
                         </button>
                     </div>
 
-                    <!-- NAVIGATION LINKS -->
-                    <nav class="space-y-3">
-                        <a href="{{ route('admin.dashboard') }}" class="flex items-center space-x-3 p-3 rounded-xl font-bold transition-all duration-200 {{ request()->routeIs('admin.dashboard') ? 'bg-[#1D4ED8] text-white shadow-md' : 'text-gray-900 hover:bg-yellow-400' }}">
-                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M4 13h6a1 1 0 001-1V4a1 1 0 00-1-1H4a1 1 0 00-1 1v8a1 1 0 001 1zm0 7h6a1 1 0 001-1v-4a1 1 0 00-1-1H4a1 1 0 00-1 1v4a1 1 0 001 1zm10 0h6a1 1 0 001-1v-8a1 1 0 00-1-1h-6a1 1 0 00-1 1v8a1 1 0 00１ １zm０－１７v４a１ １ ０ ００１ １h６a１ １ ０ ００１－１V３a１ １ ０ ００－１－１h－６a１ １ ０ ００－１ １z"/></svg>
+                    <!-- NAVIGATION LINKS (Sudah seragam pakai rounded-2xl dan efek hover kapsul) -->
+                    <nav class="space-y-2">
+                        <a href="{{ route('admin.dashboard') }}" class="flex items-center space-x-3 px-4 py-3 rounded-2xl font-bold transition-all duration-200 {{ request()->routeIs('admin.dashboard') ? 'bg-[#1D4ED8] text-white shadow-md' : 'text-gray-900 hover:bg-yellow-300 hover:shadow-sm' }}">
+                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M4 13h6a1 1 0 001-1V4a1 1 0 00-1-1H4a1 1 0 00-1 1v8a1 1 0 001 1zm0 7h6a1 1 0 001-1v-4a1 1 0 00-1-1H4a1 1 0 00-1 1v4a1 1 0 001 1zm10 0h6a1 1 0 001-1v-8a1 1 0 00-1-1h-6a1 1 0 00-1 1v8a1 1 0 001 1zm0-17v4a1 1 0 001 1h6a1 1 0 001-1V3a1 1 0 00-1-1h-6a1 1 0 00-1 1z"/></svg>
                             <span>Dashboard</span>
                         </a>
 
-                        <!-- Manajemen Loket -->
-                        <a href="{{ route('admin.loket.index') }}" class="flex items-center space-x-3 px-4 py-3 rounded-2xl font-bold text-gray-900 hover:bg-yellow-300 transition {{ request()->routeIs('admin.loket.*') ? 'bg-blue-600 text-white hover:bg-blue-700' : '' }}">
-                            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <a href="{{ route('admin.loket.index') }}" class="flex items-center space-x-3 px-4 py-3 rounded-2xl font-bold transition-all duration-200 {{ request()->routeIs('admin.loket.*') ? 'bg-[#1D4ED8] text-white shadow-md' : 'text-gray-900 hover:bg-yellow-300 hover:shadow-sm' }}">
+                            <svg class="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5m0 0h4m-4 0V11m0 0h4m-4 0H9"/>
                             </svg>
                             <span>Manajemen Loket</span>
                         </a>
 
-                        <a href="{{ route('admin.layanan.index') }}" class="flex items-center space-x-3 p-3 rounded-xl font-bold transition-all duration-200 {{ request()->routeIs('admin.layanan.*') ? 'bg-[#1D4ED8] text-white shadow-md' : 'text-gray-900 hover:bg-yellow-400' }}">
+                        <a href="{{ route('admin.layanan.index') }}" class="flex items-center space-x-3 px-4 py-3 rounded-2xl font-bold transition-all duration-200 {{ request()->routeIs('admin.layanan.*') ? 'bg-[#1D4ED8] text-white shadow-md' : 'text-gray-900 hover:bg-yellow-300 hover:shadow-sm' }}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/></svg>
                             <span>Manajemen Layanan</span>
                         </a>
 
-                        <a href="{{ route('admin.petugas.index') }}" class="flex items-center space-x-3 p-3 rounded-xl font-bold transition-all duration-200 {{ request()->routeIs('admin.petugas.*') ? 'bg-[#1D4ED8] text-white shadow-md' : 'text-gray-900 hover:bg-yellow-400' }}">
+                        <a href="{{ route('admin.petugas.index') }}" class="flex items-center space-x-3 px-4 py-3 rounded-2xl font-bold transition-all duration-200 {{ request()->routeIs('admin.petugas.*') ? 'bg-[#1D4ED8] text-white shadow-md' : 'text-gray-900 hover:bg-yellow-300 hover:shadow-sm' }}">
                             <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                             <span>Manajemen Petugas</span>
                         </a>
 
-                        <a href="{{ route('admin.rekap.index') }}" class="flex items-center space-x-3 p-3 rounded-xl font-bold transition-all duration-200 {{ request()->routeIs('admin.rekap.*') ? 'bg-[#1D4ED8] text-white shadow-md' : 'text-gray-900 hover:bg-yellow-400' }}">
+                        <a href="{{ route('admin.rekap.index') }}" class="flex items-center space-x-3 px-4 py-3 rounded-2xl font-bold transition-all duration-200 {{ request()->routeIs('admin.rekap.*') ? 'bg-[#1D4ED8] text-white shadow-md' : 'text-gray-900 hover:bg-yellow-300 hover:shadow-sm' }}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                             <span>Rekap Laporan</span>
                         </a>

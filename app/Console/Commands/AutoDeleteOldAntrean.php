@@ -9,13 +9,15 @@ use Carbon\Carbon;
 class AutoDeleteOldAntrean extends Command
 {
     protected $signature = 'antrean:purge-old';
-    protected $description = 'Menghapus data rekap antrean yang sudah berusia lebih dari 2 bulan (60 hari)';
+    protected $description = 'Menghapus data rekap antrean yang sudah berusia lebih dari 1 tahun';
 
     public function handle()
     {
-        $twoMonthsAgo = Carbon::now()->subMonths(3)->toDateString();
-        $deleted = Antrean::where('tanggal', '<', $twoMonthsAgo)->delete();
+        // Mengubah durasi menjadi 1 tahun ke belakang
+        $oneYearAgo = Carbon::now()->subYear()->toDateString();
+        
+        $deleted = Antrean::where('tanggal', '<', $oneYearAgo)->delete();
 
-        $this->info("Berhasil menghapus {$deleted} data antrean lama.");
+        $this->info("Berhasil menghapus {$deleted} data antrean lama yang berusia lebih dari 1 tahun.");
     }
 }
