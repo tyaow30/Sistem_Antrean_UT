@@ -61,7 +61,7 @@
                     Silakan menuju ke
                 </p>
                 <p id="loket-aktif" class="text-2xl lg:text-4xl font-extrabold text-brand-yellow uppercase tracking-wider">
-                     MENUNGGU PANGGILAN
+                    MENUNGGU PANGGILAN
                 </p>
             </div>
         </section>
@@ -79,7 +79,7 @@
 
     </main>
 
-    <!-- FOOTER COPYRIGHT & AUDIO NOTIFICATION -->
+    <!-- FOOTER COPYRIGHT -->
     <footer class="mt-6 text-center space-y-1">
         <p class="text-sm font-medium text-slate-500">
             © 2026 Universitas Terbuka. All rights reserved.
@@ -120,14 +120,21 @@
                 const data = await response.json();
 
                 if (data.aktif) {
-                    const nomor = data.aktif.nomor_antrean;
-                    const loketNomor = data.aktif.loket_asal ? data.aktif.loket_asal.nomor_loket : '-';
+                    const antrean = data.aktif;
+                    const nomor = antrean.nomor_antrean;
                     
-                    // Format tampilan: Kasih prefiks L(NomorLoket)-NomorAntrean (Contoh: L1-2)
-                    const formatNomor = `L${loketNomor}-${nomor}`;
+                    // Loket Asal (untuk prefiks nomor tiket, misal L1 dari loket asal)
+                    const loketAsalNomor = antrean.loket_asal ? antrean.loket_asal.nomor_loket : '-';
+                    
+                    // Loket Tujuan / Loket Pelayanan (tempat dia benar-benar dipanggil sekarang)
+                    const loketPelayananNomor = antrean.loket_pelayanan ? antrean.loket_pelayanan.nomor_loket : loketAsalNomor;
+                    
+                    // Format tampilan nomor tetap menggunakan loket asal tiket dicetak (misal: L1-3)
+                    const formatNomor = `L${loketAsalNomor}-${nomor}`;
                     
                     document.getElementById('nomor-aktif').innerText = formatNomor;
-                    document.getElementById('loket-aktif').innerText = `MENUJU LOKET ${loketNomor}`;
+                    // Tapi teks instruksinya mengarah ke loket pelayanan yang baru (hasil alihan)
+                    document.getElementById('loket-aktif').innerText = `MENUJU LOKET ${loketPelayananNomor}`;
                 }
 
                 updateRiwayatUI(data.riwayat);
@@ -139,8 +146,8 @@
         function updateRiwayatUI(riwayat) {
             if (riwayat && riwayat.length > 0) {
                 const listHtml = riwayat.map(item => {
-                    const loketNomor = item.loket_asal ? item.loket_asal.nomor_loket : '-';
-                    const formatNomor = `L${loketNomor}-${item.nomor_antrean}`;
+                    const loketAsalNomor = item.loket_asal ? item.loket_asal.nomor_loket : '-';
+                    const formatNomor = `L${loketAsalNomor}-${item.nomor_antrean}`;
                     return `
                         <div class="bg-brand-darkblue text-white text-center py-3.5 px-4 rounded-xl shadow-sm">
                             <span class="text-2xl lg:text-3xl font-extrabold tracking-wider block">
@@ -161,14 +168,17 @@
                     .listen('.antrean.dipanggil', (e) => {
                         const antrean = e.antrean;
                         const nomor = antrean.nomor_antrean;
-                        const loketNomor = antrean.loket_asal ? antrean.loket_asal.nomor_loket : '-';
-                        const formatNomor = `L${loketNomor}-${nomor}`;
+                        
+                        const loketAsalNomor = antrean.loket_asal ? antrean.loket_asal.nomor_loket : '-';
+                        const loketPelayananNomor = antrean.loket_pelayanan ? antrean.loket_pelayanan.nomor_loket : loketAsalNomor;
+                        
+                        const formatNomor = `L${loketAsalNomor}-${nomor}`;
 
                         document.getElementById('nomor-aktif').innerText = formatNomor;
-                        document.getElementById('loket-aktif').innerText = `MENUJU LOKET ${loketNomor}`;
+                        document.getElementById('loket-aktif').innerText = `MENUJU LOKET ${loketPelayananNomor}`;
 
-                        // Suara AI yang lebih natural dan tidak membingungkan
-                        speak(`Nomor antrean ${nomor}, silakan menuju ke loket ${loketNomor}`);
+                        // Suara memanggil nomor tiket asli, tapi mengarah ke loket pelayanan yang dituju
+                        speak(`Nomor antrean ${formatNomor}, silakan menuju ke loket ${loketPelayananNomor}`);
 
                         fetchInitialData();
                     });

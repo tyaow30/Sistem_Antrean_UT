@@ -52,9 +52,13 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'role:PETUGAS'])->group(function () {
     Route::get('/petugas/dashboard', [PetugasController::class, 'index'])->name('petugas.dashboard');
     Route::post('/petugas/heartbeat', [PetugasController::class, 'heartbeat'])->name('petugas.heartbeat');
-    Route::post('/petugas/panggil-next', [PetugasController::class, 'panggilBerikutnya'])->name('petugas.panggil-next');
+    
+    // Alur 2 Langkah: Ambil data -> Panggil Suara
+    Route::post('/petugas/selanjutnya', [PetugasController::class, 'selanjutnya'])->name('petugas.selanjutnya');
+    Route::post('/petugas/panggil/{id}', [PetugasController::class, 'panggil'])->name('petugas.panggil');
     Route::post('/petugas/panggil-ulang/{id}', [PetugasController::class, 'panggilUlang'])->name('petugas.panggil-ulang');
     Route::post('/petugas/panggil-bantuan/{id}', [PetugasController::class, 'panggilBantuan'])->name('petugas.panggil-bantuan');
+    
     Route::post('/petugas/selesai/{id}', [PetugasController::class, 'selesai'])->name('petugas.selesai');
     Route::post('/petugas/lewati/{id}', [PetugasController::class, 'lewati'])->name('petugas.lewati');
     Route::post('/petugas/update-status/{id}', [PetugasController::class, 'updateStatus'])->name('petugas.update-status');
@@ -79,10 +83,10 @@ Route::middleware(['auth', 'role:ADMIN'])->group(function () {
     // FITUR MANAJEMEN PETUGAS
     Route::get('/admin/petugas', [AdminController::class, 'indexPetugas'])->name('admin.petugas.index');
     Route::post('/admin/petugas', [AdminController::class, 'storePetugas'])->name('admin.petugas.store');
-    Route::put('/admin/petugas/{id}', [AdminController::class, 'updateAkunPetugas'])->name('admin.petugas.update'); // Diubah ke updateAkunPetugas
+    Route::put('/admin/petugas/{id}', [AdminController::class, 'updateAkunPetugas'])->name('admin.petugas.update');
     Route::delete('/admin/petugas/{id}', [AdminController::class, 'destroyPetugas'])->name('admin.petugas.destroy');
 
-    // CRUD LOKET (Diubah ke LoketController)
+    // CRUD LOKET
     Route::get('/admin/loket', [LoketController::class, 'index'])->name('admin.loket.index');
     Route::post('/admin/loket', [LoketController::class, 'store'])->name('admin.loket.store');
     Route::put('/admin/loket/{id}', [LoketController::class, 'update'])->name('admin.loket.update');

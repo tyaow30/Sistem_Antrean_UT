@@ -35,7 +35,7 @@ return new class extends Migration
 
         Schema::create('antrean', function (Blueprint $table) {
             $table->id();
-            $table->string('nomor_antrean'); // contoh: G1-L1-001
+            $table->unsignedInteger('nomor_antrean'); 
             $table->foreignId('gerai_id')->constrained('gerai')->onDelete('cascade');
             $table->foreignId('loket_asal_id')->constrained('loket')->onDelete('cascade');
             $table->foreignId('loket_melayani_id')->nullable()->constrained('loket')->nullOnDelete();

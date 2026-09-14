@@ -57,7 +57,18 @@
             <div class="lg:col-span-3 bg-[#004A8D] rounded-2xl p-6 md:p-8 text-white shadow-xl flex flex-col justify-between min-h-[400px]">
                 
                 <div>
-                    <p class="font-semibold tracking-wide text-sm mb-4">SEDANG DILAYANI</p>
+                    <div class="flex justify-between items-center mb-4">
+                        <p class="font-semibold tracking-wide text-sm">SEDANG DILAYANI</p>
+                        @if(isset($antreanSaatIni) && $antreanSaatIni->status === 'PREPARING')
+                            <span class="bg-yellow-400 text-[#003B70] text-xs font-bold px-3 py-1 rounded-full uppercase animate-pulse">
+                                Data Terintip (Belum Dipanggil)
+                            </span>
+                        @elseif(isset($antreanSaatIni) && in_array($antreanSaatIni->status, ['CALLED', 'SERVING']))
+                            <span class="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full uppercase">
+                                Dipanggil
+                            </span>
+                        @endif
+                    </div>
                     
                     <!-- Area Nomor Antrean -->
                     <div class="mb-8">
@@ -66,7 +77,7 @@
                         </h1>
                     </div>
                     
-                    <!-- Area Detail Mahasiswa (Dinamis dari Database) -->
+                    <!-- Area Detail Mahasiswa -->
                     <div class="space-y-3 mb-8 text-lg">
                         <p class="flex items-center gap-3">
                             <i class="fa-solid fa-user w-6 text-center text-xl"></i> 
@@ -85,22 +96,60 @@
 
                 <!-- Tombol Aksi 4 Kotak -->
                 <div class="grid grid-cols-2 gap-4">
-                    <form action="{{ isset($antreanSaatIni) && $antreanSaatIni ? route('petugas.panggil-ulang', $antreanSaatIni->id) : route('petugas.panggil-next') }}" method="POST" class="m-0">
-                        @csrf
-                        <button type="submit" class="w-full bg-[#FFCC00] text-[#003B70] font-bold py-3 px-4 rounded-xl shadow-md hover:bg-yellow-500 transition">
-                            {{ isset($antreanSaatIni) && $antreanSaatIni ? 'PANGGIL ULANG' : 'PANGGIL BERIKUTNYA' }}
-                        </button>
-                    </form>
-                    <button type="button" onclick="bukaModal()" class="w-full bg-[#F57C00] text-white font-bold py-3 px-4 rounded-xl shadow-md hover:bg-orange-600 transition">ALIHKAN</button>                     
                     
+                    <!-- TOMBOL UTAMA (SELANJUTNYA / PANGGIL / PANGGIL ULANG) -->
+                    @if(!isset($antreanSaatIni) || !$antreanSaatIni)
+                        <!-- Jika Belum Ada Antrean Aktif -->
+                        <form action="{{ route('petugas.selanjutnya') }}" method="POST" class="m-0">
+                            @csrf
+                            <button type="submit" class="w-full bg-[#FFCC00] text-[#003B70] font-bold py-3 px-4 rounded-xl shadow-md hover:bg-yellow-500 transition uppercase">
+                                SELANJUTNYA
+                            </button>
+                        </form>
+                    @elseif($antreanSaatIni->status === 'PREPARING')
+                        <!-- Jika Status PREPARING (Sudah Diintip, Siap Dipanggil ke Display) -->
+                        <form action="{{ route('petugas.panggil', $antreanSaatIni->id) }}" method="POST" class="m-0">
+                            @csrf
+                            <button type="submit" class="w-full bg-[#FFCC00] text-[#003B70] font-bold py-3 px-4 rounded-xl shadow-md hover:bg-yellow-500 transition uppercase animate-bounce">
+                                PANGGIL
+                            </button>
+                        </form>
+                    @else
+                        <!-- Jika Status CALLED / SERVING -->
+                        <form action="{{ route('petugas.panggil-ulang', $antreanSaatIni->id) }}" method="POST" class="m-0">
+                            @csrf
+                            <button type="submit" class="w-full bg-[#FFCC00] text-[#003B70] font-bold py-3 px-4 rounded-xl shadow-md hover:bg-yellow-500 transition uppercase">
+                                PANGGIL ULANG
+                            </button>
+                        </form>
+                    @endif
+
+                    <!-- TOMBOL ALIHKAN -->
+                    <button type="button" 
+                        onclick="bukaModal()" 
+                        {{ (!isset($antreanSaatIni) || !$antreanSaatIni) ? 'disabled' : '' }}
+                        class="w-full bg-[#F57C00] text-white font-bold py-3 px-4 rounded-xl shadow-md hover:bg-orange-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        ALIHKAN
+                    </button> 
+                    
+                    <!-- TOMBOL SELESAI -->
                     <form action="{{ isset($antreanSaatIni) && $antreanSaatIni ? route('petugas.selesai', $antreanSaatIni->id) : '#' }}" method="POST" class="m-0">
                         @csrf
-                        <button type="submit" class="w-full bg-[#388E3C] text-white font-bold py-3 px-4 rounded-xl shadow-md hover:bg-green-700 transition">SELESAI</button>
+                        <button type="submit" 
+                            {{ (!isset($antreanSaatIni) || !$antreanSaatIni) ? 'disabled' : '' }}
+                            class="w-full bg-[#388E3C] text-white font-bold py-3 px-4 rounded-xl shadow-md hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            SELESAI
+                        </button>
                     </form>
 
+                    <!-- TOMBOL LEWATI -->
                     <form action="{{ isset($antreanSaatIni) && $antreanSaatIni ? route('petugas.lewati', $antreanSaatIni->id) : '#' }}" method="POST" class="m-0">
                         @csrf
-                        <button type="submit" class="w-full bg-[#D32F2F] text-white font-bold py-3 px-4 rounded-xl shadow-md hover:bg-red-700 transition">LEWATI</button>
+                        <button type="submit" 
+                            {{ (!isset($antreanSaatIni) || !$antreanSaatIni) ? 'disabled' : '' }}
+                            class="w-full bg-[#D32F2F] text-white font-bold py-3 px-4 rounded-xl shadow-md hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            LEWATI
+                        </button>
                     </form>
                 </div>
             </div>
@@ -139,7 +188,7 @@
                                         <span class="font-bold text-xl block">L{{ $partnerLoket }} - {{ str_pad($bantu->nomor_antrean, 3, '0', STR_PAD_LEFT) }}</span>
                                         <span class="text-xs font-semibold">Asal : Loket {{ $partnerLoket }} - {{ $bantu->serviceAwal->nama_layanan ?? '' }}</span>
                                     </div>
-                                    <form action="{{ route('petugas.ambil-bantuan', $bantu->id) }}" method="POST">
+                                    <form action="{{ route('petugas.panggil-bantuan', $bantu->id) }}" method="POST">
                                         @csrf
                                         <button type="submit" class="bg-[#004A8D] text-white text-xs font-bold py-2 px-4 rounded-lg hover:bg-blue-900 transition">BANTU</button>
                                     </form>
@@ -154,7 +203,7 @@
             </div>
         </div>
         
-        <!-- Footer / Copyright -->
+        <!-- Footer -->
         <div class="text-center text-gray-400 text-sm mt-8">
             &copy; 2026 Universitas Terbuka. All rights reserved.
         </div>

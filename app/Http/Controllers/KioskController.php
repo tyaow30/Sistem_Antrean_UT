@@ -76,11 +76,12 @@ class KioskController extends Controller
                 }
 
                 // Hitung nomor antrean berikutnya untuk loket tersebut
-                $lastAntrean = Antrean::where('tanggal', $today)
+                    $lastAntrean = Antrean::where('tanggal', $today)
                     ->where('loket_asal_id', $loket->id)
-                    ->max('nomor_antrean');
+                    ->orderBy('id', 'desc')
+                    ->first();
 
-                $nomorBaru = ((int) $lastAntrean) + 1;
+                $nomorBaru = $lastAntrean ? ((int) $lastAntrean->nomor_antrean) + 1 : 1;
 
                 return Antrean::create([
                     'tanggal'            => $today,

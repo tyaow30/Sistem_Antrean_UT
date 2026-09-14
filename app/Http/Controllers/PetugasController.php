@@ -32,15 +32,15 @@ class PetugasController extends Controller
             'last_heartbeat_at' => now(),
         ]);
 
-        // 3. Antrean yang sedang dipanggil/dilayani petugas ini
+        // 3. Antrean yang sedang diintip (PREPARING) / dipanggil (CALLED) / dilayani (SERVING)
         $antreanSaatIni = Antrean::where('tanggal', $today)
             ->where('petugas_id', $user->id)
-            ->whereIn('status', ['CALLED', 'SERVING'])
+            ->whereIn('status', ['PREPARING', 'CALLED', 'SERVING'])
             ->first();
 
-        // 4. Antrean WAITING milik loket sendiri
+        // 4. Antrean WAITING milik loket ini (Berdasarkan loket_pelayanan_id agar antrean alihan masuk ke sini)
         $daftarAntreanLoket = Antrean::where('tanggal', $today)
-            ->where('loket_asal_id', $user->assigned_loket_id)
+            ->where('loket_pelayanan_id', $user->assigned_loket_id)
             ->where('status', 'WAITING')
             ->orderBy('id', 'asc')
             ->get();
@@ -58,11 +58,11 @@ class PetugasController extends Controller
         $adaAntreanAktif = $antreanSaatIni !== null;
         $adaAntreanSendiri = $adaAntreanWaiting || $adaAntreanAktif;
 
-        // 7. Antrean Bantuan dari loket lain
+        // 7. Antrean Bantuan dari loket lain (Yang loket pelayanannya bukan milik dia, dan status masih waiting di loket asalnya)
         $daftarAntreanBantuan = collect();
         if (!$adaAntreanSendiri || !$adaPetugasLainAktif) {
             $daftarAntreanBantuan = Antrean::where('tanggal', $today)
-                ->where('loket_asal_id', '!=', $user->assigned_loket_id)
+                ->where('loket_pelayanan_id', '!=', $user->assigned_loket_id)
                 ->where('status', 'WAITING')
                 ->orderBy('id', 'asc')
                 ->get();
@@ -112,8 +112,8 @@ class PetugasController extends Controller
         return response()->json(['success' => true, 'message' => 'Heartbeat berhasil.']);
     }
 
-    // Panggil Antrean Berikutnya di Loket Sendiri
-    public function panggilBerikutnya()
+    // TAHAP 1: Ambil Antrean Berikutnya (Status PREPARING - Tanpa Suara)
+    public function selanjutnya()
     {
         /** @var User $user */
         $user = auth()->user();
@@ -121,15 +121,16 @@ class PetugasController extends Controller
 
         $sedangDilayani = Antrean::where('tanggal', $today)
             ->where('petugas_id', $user->id)
-            ->whereIn('status', ['CALLED', 'SERVING'])
+            ->whereIn('status', ['PREPARING', 'CALLED', 'SERVING'])
             ->exists();
 
         if ($sedangDilayani) {
             return back()->with('error', 'Selesaikan atau lewati antrean saat ini terlebih dahulu!');
         }
 
+        // Ambil antrean berdasarkan loket_pelayanan_id (mencakup antrean murni loket tersebut + antrean alihan)
         $antrean = Antrean::where('tanggal', $today)
-            ->where('loket_asal_id', $user->assigned_loket_id)
+            ->where('loket_pelayanan_id', $user->assigned_loket_id)
             ->where('status', 'WAITING')
             ->orderBy('id', 'asc')
             ->first();
@@ -139,18 +140,15 @@ class PetugasController extends Controller
         }
 
         $antrean->update([
-            'status' => 'CALLED',
+            'status' => 'PREPARING',
             'petugas_id' => $user->id,
             'loket_pelayanan_id' => $user->assigned_loket_id,
-            'waktu_dipanggil' => now(),
         ]);
 
-        event(new AntreanDipanggil($antrean->load(['loketPelayanan', 'serviceAwal'])));
-
-        return back()->with('success', 'Memanggil nomor ' . $antrean->nomor_antrean);
+        return back()->with('success', 'Data antrean nomor ' . $antrean->nomor_antrean . ' berhasil disiapkan.');
     }
 
-    // Panggil Antrean Bantuan dari Loket Lain
+    // TAHAP 1 (BANTUAN): Ambil Antrean Bantuan (Status PREPARING - Tanpa Suara)
     public function panggilBantuan($id)
     {
         /** @var User $user */
@@ -174,7 +172,7 @@ class PetugasController extends Controller
         $antrean = DB::transaction(function () use ($id, $today, $user, $loket) {
             $sedangDilayani = Antrean::where('tanggal', $today)
                 ->where('petugas_id', $user->id)
-                ->whereIn('status', ['CALLED', 'SERVING'])
+                ->whereIn('status', ['PREPARING', 'CALLED', 'SERVING'])
                 ->lockForUpdate()
                 ->exists();
 
@@ -184,7 +182,7 @@ class PetugasController extends Controller
 
             $antrean = Antrean::where('id', $id)
                 ->where('tanggal', $today)
-                ->where('loket_asal_id', '!=', $loket->id)
+                ->where('loket_pelayanan_id', '!=', $loket->id)
                 ->where('status', 'WAITING')
                 ->lockForUpdate()
                 ->first();
@@ -194,24 +192,48 @@ class PetugasController extends Controller
             }
 
             $antrean->update([
-                'status' => 'CALLED',
+                'status' => 'PREPARING',
                 'petugas_id' => $user->id,
                 'loket_pelayanan_id' => $user->assigned_loket_id,
-                'waktu_dipanggil' => now(),
             ]);
 
             return $antrean->fresh();
         });
 
         if (!$antrean) {
-            return back()->with('error', 'Antrean bantuan sudah dipanggil petugas lain atau Anda masih memiliki antrean aktif.');
+            return back()->with('error', 'Antrean bantuan sudah diambil petugas lain atau Anda masih memiliki antrean aktif.');
         }
+
+        return back()->with('success', 'Menyiapkan Data Bantuan ' . $antrean->nomor_antrean);
+    }
+
+    // TAHAP 2: Panggil Antrean (Bunyikan Suara Pemanggilan)
+    public function panggil($id)
+    {
+        $user = auth()->user();
+        $today = now()->toDateString();
+
+        $antrean = Antrean::where('id', $id)
+            ->where('tanggal', $today)
+            ->where('petugas_id', $user->id)
+            ->where('status', 'PREPARING')
+            ->first();
+
+        if (!$antrean) {
+            return back()->with('error', 'Antrean tidak valid untuk dipanggil.');
+        }
+
+        $antrean->update([
+            'status' => 'CALLED',
+            'waktu_dipanggil' => now(),
+        ]);
 
         event(new AntreanDipanggil($antrean->load(['loketPelayanan', 'serviceAwal'])));
 
-        return back()->with('success', 'Memanggil Antrean Bantuan ' . $antrean->nomor_antrean);
+        return back()->with('success', 'Memanggil nomor ' . $antrean->nomor_antrean);
     }
 
+    // Panggil Ulang Antrean
     public function panggilUlang($id)
     {
         $user = auth()->user();
@@ -235,7 +257,7 @@ class PetugasController extends Controller
             $antrean = Antrean::where('id', $id)
                 ->where('tanggal', $today)
                 ->where('petugas_id', $user->id)
-                ->where('status', 'CALLED')
+                ->whereIn('status', ['CALLED', 'SERVING'])
                 ->lockForUpdate()
                 ->first();
 
@@ -259,7 +281,7 @@ class PetugasController extends Controller
         return back()->with('success', 'Memanggil ulang antrean ' . $antrean->nomor_antrean);
     }
 
-    // Tombol Selesai 
+    // Tombol Selesai
     public function selesai($id)
     {
         $user = auth()->user();
@@ -282,7 +304,7 @@ class PetugasController extends Controller
         return back()->with('success', 'Antrean telah diselesaikan.');
     }
 
-    // Tombol Lewati 
+    // Tombol Lewati
     public function lewati($id)
     {
         $user = auth()->user();
@@ -309,7 +331,7 @@ class PetugasController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
-            'status' => 'required|in:SERVING,DONE,SKIPPED,CALLED',
+            'status' => 'required|in:SERVING,DONE,SKIPPED,CALLED,PREPARING',
         ]);
 
         $user = auth()->user();
@@ -347,7 +369,7 @@ class PetugasController extends Controller
     public function alihAntrean(Request $request, $id)
     {
         $request->validate([
-            'loket_tujuan' => 'required',
+            'loket_tujuan' => 'required|exists:loket,id',
             'catatan' => 'nullable|string|max:255',
         ]);
 
@@ -357,21 +379,23 @@ class PetugasController extends Controller
         $antrean = Antrean::where('id', $id)
             ->where('tanggal', $today)
             ->where('petugas_id', $user->id)
-            ->whereIn('status', ['CALLED', 'SERVING'])
+            ->whereIn('status', ['PREPARING', 'CALLED', 'SERVING'])
             ->first();
 
-        if (!$antrean) {
-            return back()->with('error', 'Gagal mengalihkan! Pastikan antrean sedang aktif dilayani.');
+        if (!is_null($antrean)) {
+            // Pindahkan kepemilikan pelayanan sepenuhnya ke loket tujuan
+            $antrean->update([
+                'status' => 'WAITING',
+                'loket_pelayanan_id' => $request->loket_tujuan, // Pindah ke Loket Tujuan
+                'petugas_id' => null, // Lepas dari petugas loket asal
+                'waktu_dipanggil' => null,
+                'kendala' => 'Dialihkan dari Loket ' . ($user->assigned_loket_id ?? '1') . ': ' . $request->catatan,
+            ]);
+
+            return back()->with('success', 'Antrean berhasil dialihkan ke Loket tujuan.');
         }
 
-        $antrean->update([
-            'status' => 'WAITING',
-            'loket_asal_id' => $request->loket_tujuan,
-            'petugas_id' => null,
-            'waktu_dipanggil' => null,
-        ]);
-
-        return back()->with('success', 'Antrean berhasil dialihkan.');
+        return back()->with('error', 'Gagal mengalihkan! Antrean tidak ditemukan.');
     }
 
     // Halaman Rekap & Laporan Petugas
@@ -393,7 +417,6 @@ class PetugasController extends Controller
         $query = Antrean::where('petugas_id', $user->id)
             ->whereBetween('tanggal', [$tanggalMulai, $tanggalSelesai]);
 
-        // Tambahkan pencarian nama atau NIM jika diisi
         if (!empty($keyword)) {
             $query->where(function($q) use ($keyword) {
                 $q->where('nama', 'like', "%{$keyword}%")
@@ -407,7 +430,6 @@ class PetugasController extends Controller
         $totalDilewati = $riwayatAntrean->where('status', 'SKIPPED')->count();
         $totalDiproses = $riwayatAntrean->count();
 
-        // Jika tombol export ditekan
         if ($request->has('export') && $request->export == 'excel') {
             return $this->exportExcel($riwayatAntrean, $loket, $tanggalMulai, $tanggalSelesai);
         }
@@ -425,7 +447,6 @@ class PetugasController extends Controller
         ));
     }
 
-    // Fungsi tambahan untuk export ke CSV/Excel sederhana tanpa package tambahan
     private function exportExcel($data, $loket, $mulai, $selesai)
     {
         $fileName = "rekap-antrean-loket-{$loket->id}-{$mulai}-to-{$selesai}.csv";
@@ -440,7 +461,6 @@ class PetugasController extends Controller
 
         $callback = function() use ($data, $loket) {
             $file = fopen('php://output', 'w');
-            // Header CSV
             fputcsv($file, ['No', 'Nomor Antrean', 'Tanggal', 'Nama Mahasiswa', 'NIM', 'Waktu Selesai', 'Status']);
 
             foreach ($data as $index => $row) {
