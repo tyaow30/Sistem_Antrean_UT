@@ -64,8 +64,9 @@
         </div>
 
         <!-- FORM UTAMA DALAM SATU CARD BIRU -->
-        <form id="form-kiosk" action="{{ ('/kiosk/cetak') }}" method="POST" class="hidden">
+        <form id="form-kiosk" action="{{ route('kiosk.cetak') }}" method="POST" class="hidden">
             @csrf
+            <input type="hidden" name="layanan_id" id="input-layanan-id" required>
             
             <div class="bg-ut-blue text-white rounded-3xl p-6 md:p-10 shadow-2xl space-y-6 relative transition-all duration-500">
                 
@@ -103,7 +104,7 @@
                     </div>
                 </div>
 
-                <!-- TOMBOL LANJUT (MUNCUL SEBELUM PILIH LAYANAN) -->
+                <!-- TOMBOL LANJUT -->
                 <div id="wrapper-btn-lanjut" class="pt-2">
                     <button type="button" onclick="bukaPilihanLayanan()"
                         class="w-full bg-ut-yellow hover:bg-ut-yellowHover text-ut-blue font-extrabold text-base py-4 rounded-xl shadow-lg transition duration-300 uppercase tracking-wider">
@@ -115,10 +116,9 @@
                     </button>
                 </div>
 
-                <!-- BAGIAN 2: PILIH LAYANAN (DI-HIDE TOTAL DI AWAL, NANTI MEMANJANG KEBAWAH PAS KLIK LANJUT) -->
+                <!-- BAGIAN 2: PILIH LAYANAN -->
                 <div id="section-pilih-layanan" class="hidden space-y-6 pt-2 animate-fadeIn">
                     
-                    <!-- GARIS PEMBATAS -->
                     <hr class="border-white/20">
 
                     <div class="space-y-4">
@@ -135,13 +135,10 @@
                             </div>
                         @endif
 
-                        <!-- HIDDEN INPUT ID LAYANAN -->
-                        <input type="hidden" name="layanan_id" id="input-layanan-id" required>
-
-                        <!-- GRID TOMBOL LAYANAN (UNIK / TIDAK DOBEL) -->
+                        <!-- GRID TOMBOL LAYANAN -->
                         <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                             @php
-                                $uniqueLayanan = $layananList->unique('nama_layanan');
+                                $uniqueLayanan = isset($layananList) ? $layananList->unique('nama_layanan') : collect();
                             @endphp
 
                             @forelse($uniqueLayanan as $layanan)
@@ -190,9 +187,7 @@
             document.getElementById('input-nim').value = '';
             document.getElementById('input-nohp').value = '';
             document.getElementById('input-kendala').value = '';
-            document.getElementById('input-layanan-id').value = '';
 
-            // Sembunyikan bagian layanan dan reset tombol lanjut
             document.getElementById('section-pilih-layanan').classList.add('hidden');
             document.getElementById('wrapper-btn-lanjut').classList.remove('hidden');
 
@@ -215,21 +210,16 @@
                 return;
             }
 
-            // Tampilkan nama di bagian layanan
             document.getElementById('display-nama-mhs').innerText = nama;
 
-            // Sembunyikan tombol lanjut, lalu "memanjangkan" card dengan memunculkan bagian pilihan layanan
             document.getElementById('wrapper-btn-lanjut').classList.add('hidden');
             document.getElementById('section-pilih-layanan').classList.remove('hidden');
         }
 
         function tutupPilihanLayanan() {
-            // Kalau mau edit data lagi, sembunyikan lagi bagian layanannya
             document.getElementById('section-pilih-layanan').classList.add('hidden');
             document.getElementById('wrapper-btn-lanjut').classList.remove('hidden');
-            document.getElementById('input-layanan-id').value = '';
 
-            // Reset pilihan layanan
             document.querySelectorAll('.layanan-btn').forEach(btn => {
                 btn.classList.remove('bg-ut-blue', 'text-white', 'border-ut-yellow', 'ring-2', 'ring-ut-yellow');
                 btn.classList.add('bg-white', 'text-ut-blue');
@@ -243,17 +233,14 @@
         function pilihLayanan(id, element) {
             document.getElementById('input-layanan-id').value = id;
 
-            // Reset warna semua tombol layanan
             document.querySelectorAll('.layanan-btn').forEach(btn => {
                 btn.classList.remove('bg-ut-blue', 'text-white', 'border-ut-yellow', 'ring-2', 'ring-ut-yellow');
                 btn.classList.add('bg-white', 'text-ut-blue');
             });
 
-            // Beri tanda aktif pada tombol yang dipilih
             element.classList.remove('bg-white', 'text-ut-blue');
             element.classList.add('bg-ut-blue', 'text-white', 'border-ut-yellow', 'ring-2', 'ring-ut-yellow');
 
-            // Aktifkan tombol Ambil Antrean
             const btnSubmit = document.getElementById('btn-submit-antrean');
             btnSubmit.disabled = false;
             btnSubmit.classList.remove('opacity-50', 'cursor-not-allowed');

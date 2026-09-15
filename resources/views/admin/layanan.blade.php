@@ -34,10 +34,19 @@
         this.isEdit = true;
         this.isOpen = true;
         this.formUrl = '{{ url('/admin/layanan') }}/' + item.id;
+        
+        // Diperbaiki agar membaca id loket dari relasi many-to-many (lokets)
+        let selectedLoketId = '';
+        if (item.lokets && item.lokets.length > 0) {
+            selectedLoketId = item.lokets[0].id;
+        } else if (item.loket_id) {
+            selectedLoketId = item.loket_id;
+        }
+
         this.formData = { 
             id: item.id, 
             nama_layanan: item.nama_layanan,
-            loket_id: item.loket_id ?? ''
+            loket_id: selectedLoketId
         };
     }
 }">
@@ -128,10 +137,15 @@
                             <td class="p-3.5 pl-5 font-extrabold text-white">{{ $layanan->firstItem() + $index }}</td>
                             <td class="p-3.5 font-bold text-white capitalize">{{ $item->nama_layanan }}</td>
                             <td class="p-3.5 font-bold text-white">
-                                @if($item->loket)
-                                    <span class="bg-[#0B3B82] text-white px-3 py-1 rounded-full text-xs font-bold inline-block shadow-xs">
-                                        {{ $item->loket->nama_loket }}
-                                    </span>
+                                <!-- DIPERBAIKI: Menggunakan perulangan karena relasi belongsToMany (bisa lebih dari 1 loket) -->
+                                @if($item->lokets && $item->lokets->count() > 0)
+                                    <div class="flex flex-wrap gap-1">
+                                        @foreach($item->lokets as $loket)
+                                            <span class="bg-[#0B3B82] text-white px-3 py-1 rounded-full text-xs font-bold inline-block shadow-xs">
+                                                {{ $loket->nama_loket }}
+                                            </span>
+                                        @endforeach
+                                    </div>
                                 @else
                                     <span class="text-blue-200 text-xs italic">Belum dihubungkan</span>
                                 @endif
@@ -230,7 +244,7 @@
                             >
                         </div>
 
-                        <!-- INPUT: PILIH LOKET (Diubah dari loket_ids[] menjadi loket_id) -->
+                       <!-- INPUT: PILIH LOKET (loket_id) -->
                         <div>
                             <label class="block text-[#0A4191] text-base font-extrabold mb-2">
                                 Pilih Loket Terkait
@@ -244,8 +258,9 @@
                                 >
                                     <option value="" disabled class="text-slate-300">-- Pilih Loket --</option>
                                     @foreach($lokets as $loketItem)
+                                        <!-- Pastikan value-nya murni ID angka dari database -->
                                         <option value="{{ $loketItem->id }}" class="bg-[#0A4191] text-white py-1">
-                                            {{ $loketItem->nama_loket }}
+                                            {{ $loketItem->nama_loket }} (ID: {{ $loketItem->id }})
                                         </option>
                                     @endforeach
                                 </select>

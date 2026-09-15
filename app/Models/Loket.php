@@ -57,8 +57,8 @@ class Loket extends Model
         return $this->belongsToMany(Service::class, 'counter_services', 'loket_id', 'service_id');
     }
 
-    public function layanans()
-{
-    return $this->hasMany(Layanan::class);
-}
+    public function layanans(): BelongsToMany
+    {
+        return $this->belongsToMany(Layanan::class, 'counter_services', 'loket_id', 'service_id');
+    }
 }

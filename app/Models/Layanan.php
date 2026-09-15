@@ -4,23 +4,22 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Layanan extends Model
 {
     use HasFactory;
 
     protected $table = 'services';
-    protected $fillable = ['loket_id', 'nama_layanan', 'deskripsi'];
+    protected $fillable = ['nama_layanan', 'deskripsi', 'is_active'];
 
-    // Relasi One-to-Many ke Loket (karena ada kolom loket_id di tabel layanans)
-    public function loket()
+    public function loket(): BelongsToMany
     {
-        return $this->belongsTo(Loket::class, 'loket_id');
+        return $this->belongsToMany(Loket::class, 'counter_services', 'service_id', 'loket_id');
     }
 
-    // Alias jamak jika dibutuhkan di tempat lain
-    public function lokets()
+    public function lokets(): BelongsToMany
     {
-        return $this->belongsTo(Loket::class, 'loket_id');
+        return $this->belongsToMany(Loket::class, 'counter_services', 'service_id', 'loket_id');
     }
 }

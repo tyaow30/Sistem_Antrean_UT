@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Loket;
 use App\Models\Antrean;
 use App\Models\SesiHari;
+use App\Models\Service;
 use Illuminate\Http\Request;
-use App\Models\Layanan;
 use Illuminate\Support\Facades\DB;
 
 class KioskController extends Controller
@@ -18,18 +18,21 @@ class KioskController extends Controller
     {
         $today = now()->toDateString();
         $sesi = SesiHari::where('tanggal', $today)->first();
-        $layananList = Layanan::all(); 
+        $layananList = Service::all(); 
 
         return view('kiosk.index', compact('layananList', 'sesi'));
     }
 
     /**
-     * Halaman Utama Kiosk (Form Data Diri & Pilihan Loket dalam 1 Halaman)
+     * Halaman Utama Kiosk (Form Data Diri & Pilihan Layanan dalam 1 Halaman)
      */
     public function index()
     {
         $today = now()->toDateString();
         $sesi = SesiHari::where('tanggal', $today)->first();
+
+        // Menggunakan model Service yang terhubung ke tabel 'services'
+        $layananList = Service::all();
 
         // Ambil daftar loket yang aktif beserta total antrean hari ini
         $loketList = Loket::where('status', 'ACTIVE')
@@ -39,17 +42,16 @@ class KioskController extends Controller
             }])
             ->get();
 
-        return view('kiosk.form-data', compact('loketList', 'sesi'));
+        return view('kiosk.index', compact('loketList', 'sesi', 'layananList'));
     }
 
     /**
-     * Memproses Pengambilan Antrean & Membuat Tiket Baru Berdasarkan Loket yang Dipilih
+     * Memproses Pengambilan Antrean & Membuat Tiket Baru Berdasarkan Layanan yang Dipilih
      */
     public function cetakTiket(Request $request)
     {
-        // 1. Validasi Input Data Pengunjung & Pastikan Layanan yang Dipilih Valid
         $request->validate([
-            'layanan_id' => 'required|exists:layanans,id', // Sesuaikan nama tabel layanan (biasanya 'layanans' atau 'layanan')
+            'layanan_id' => 'required|exists:services,id',
             'nama'       => 'required|string|max:100',
             'nim'        => 'required|string|max:50',
             'no_hp'      => 'nullable|string|max:20',
@@ -64,16 +66,8 @@ class KioskController extends Controller
         $layananId = $request->input('layanan_id');
 
         try {
-            // 2. Ambil data layanan beserta relasi loketnya (pastikan model Layanan punya relasi ke Loket, atau ambil id loket terkait)
-            // Asumsi di tabel 'layanans' ada kolom 'loket_id' atau 'loket_pelayanan_id' yang menautkan layanan ke loket.
-            $layanan = \App\Models\Layanan::findOrFail($layananId);
-            
-            // Ambil ID loket yang terikat dengan layanan ini (sesuaikan nama kolom foreign key di tabel layanans kamu, misal: loket_id)
-            $loketId = $layanan->loket_id ?? $layanan->loket_pelayanan_id ?? 1; 
-            $loket = Loket::findOrFail($loketId);
-
-            // 3. Simpan data antrean ke database menggunakan Database Transaction
-            $antrean = DB::transaction(function () use ($request, $layanan, $loket) {
+            // Simpan data antrean ke database menggunakan Database Transaction
+            $antrean = DB::transaction(function () use ($request, $layananId) {
                 $today = now()->toDateString();
 
                 // Cek apakah sesi antrean hari ini dibuka
@@ -87,19 +81,45 @@ class KioskController extends Controller
                     throw new \RuntimeException('Sesi antrean saat ini sedang ditutup oleh Admin!');
                 }
 
+                // AMBIL DATA LAYANAN & LOKETNYA LANGSUNG DI DALAM TRANSAKSI
+                $layanan = Service::with('lokets')->findOrFail($layananId);
+                $loket = $layanan->lokets->first();
+
+                if (!$loket) {
+                    $loket = Loket::first();
+                }
+
+                if (!$loket) {
+                    throw new \RuntimeException('Data Loket di database masih kosong. Harap tambahkan loket terlebih dahulu.');
+                }
+
+                // Ambil ID loket dengan aman
+                $loketId = $loket->id;
+
                 // Hitung nomor antrean berikutnya untuk loket tersebut
                 $lastAntrean = Antrean::where('tanggal', $today)
-                    ->where('loket_pelayanan_id', $loket->id)
+                    ->where('loket_pelayanan_id', $loketId)
                     ->orderBy('id', 'desc')
                     ->first();
 
                 $nomorBaru = $lastAntrean ? ((int) $lastAntrean->nomor_antrean) + 1 : 1;
 
+                dd([
+    'loket_id_yang_dicari' => $loket->id ?? 'KOSONG',
+    'data_yang_mau_disimpan' => [
+        'tanggal' => $today,
+        'loket_asal_id' => $loket->id ?? null,
+        'loket_pelayanan_id' => $loket->id ?? null,
+        'service_awal_id' => $layanan->id,
+        'nama' => $request->nama,
+    ]
+]);
+
                 return Antrean::create([
                     'tanggal'            => $today,
-                    'loket_asal_id'      => $loket->id,
-                    'loket_pelayanan_id' => $loket->id,
-                    'service_awal_id'    => $layanan->id, // Simpan ID layanan yang dipilih di sini
+                    'loket_asal_id'      => $loketId,
+                    'loket_pelayanan_id' => $loketId,
+                    'service_awal_id'    => $layanan->id, 
                     'petugas_id'         => null,
                     'nomor_antrean'      => $nomorBaru,
                     'status'             => 'PRINTING',
@@ -120,7 +140,6 @@ class KioskController extends Controller
                 ->withInput();
         }
     }
-
     /**
      * Menampilkan Halaman Preview Tiket Antrean (Kiosk PREVIEW TIKET)
      */
@@ -143,7 +162,6 @@ class KioskController extends Controller
             $antrean->update(['status' => 'WAITING']);
         }
 
-        // Setelah selesai, kembalikan ke halaman awal (welcome / index) supaya data bersih untuk pelanggan berikutnya
         return redirect()->route('kiosk.welcome')->with('success', 'Antrean berhasil dibuat! Silakan ambil tiket Anda.');
     }
 
@@ -158,7 +176,6 @@ class KioskController extends Controller
             $antrean->delete();
         }
 
-        // Kembalikan ke halaman welcome jika dibatalkan
         return redirect()->route('kiosk.welcome')->with('info', 'Pengambilan antrean dibatalkan.');
     }
 }

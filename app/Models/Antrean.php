@@ -10,7 +10,7 @@ use App\Models\Service;
 
 class Antrean extends Model
 {
-    protected $table = 'antrean';
+    protected $table = 'antreans';
     
     protected $fillable = [
         'tanggal',

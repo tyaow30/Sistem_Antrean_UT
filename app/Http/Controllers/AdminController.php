@@ -6,7 +6,7 @@ use App\Models\User;
 use App\Models\Loket;
 use App\Models\Antrean;
 use App\Models\SesiHari;
-use App\Models\Service; 
+use App\Models\Layanan; // Menggantikan Service
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -70,7 +70,9 @@ class AdminController extends Controller
         }
 
         $petugasList = User::where('role', 'PETUGAS')->with('assignedLoket')->get();
-        $layanans    = Service::with('loket')->get();
+        
+        // Diubah menggunakan model Layanan agar sinkron dengan seeder
+        $layanans    = Layanan::with('lokets')->get();
 
         return view('admin.dashboard', compact(
             'sesiHariIni', 'totalTiket', 'menunggu', 'selesai', 'dilewati',
@@ -244,7 +246,7 @@ class AdminController extends Controller
         return redirect()->back()->with('success', 'Akun petugas berhasil dihapus.');
     }
 
-    // PENUGASAN PETUGAS KE LOKET (Sinkronisasi dua arah tabel lokets & users)
+    // PENUGASAN PETUGAS KE LOKET
     public function updatePetugas(Request $request, $loketId)
     {
         $request->validate([
@@ -259,7 +261,6 @@ class AdminController extends Controller
             return redirect()->back();
         }
 
-        // Validasi apakah petugas sudah dipakai di loket lain
         if ($newPetugasId) {
             $sudahDipakai = Loket::where('active_petugas_id', $newPetugasId)
                 ->where('id', '!=', $loketId)
@@ -271,21 +272,17 @@ class AdminController extends Controller
         }
 
         DB::transaction(function () use ($loket, $newPetugasId, $oldPetugasId, $loketId) {
-            // 1. Lepas assigned_loket_id dari petugas lama jika ada
             if ($oldPetugasId) {
                 User::where('id', $oldPetugasId)->update(['assigned_loket_id' => null]);
             }
 
-            // 2. Lepas petugas lain yang mungkin memegang assigned_loket_id ini sebelumnya
             User::where('assigned_loket_id', $loketId)->update(['assigned_loket_id' => null]);
 
-            // 3. Update tabel lokets
             $loket->update([
                 'active_petugas_id' => $newPetugasId,
                 'status'            => $newPetugasId ? $loket->status : 'INACTIVE',
             ]);
 
-            // 4. Update assigned_loket_id di tabel users untuk petugas baru
             if ($newPetugasId) {
                 User::where('id', $newPetugasId)->update(['assigned_loket_id' => $loket->id]);
             }
@@ -298,7 +295,6 @@ class AdminController extends Controller
     {
         $loket = Loket::findOrFail($id);
         
-        // Lepas relasi petugas yang terikat dengan loket ini
         User::where('assigned_loket_id', $id)->update(['assigned_loket_id' => null]);
 
         $loket->delete();
@@ -311,14 +307,14 @@ class AdminController extends Controller
     {
         $lokets = Loket::all();
 
-        $query = Service::with('loket');
+        $query = Layanan::with('lokets');
 
         if ($request->filled('search')) {
             $query->where('nama_layanan', 'like', '%' . $request->search . '%');
         }
 
         if ($request->filled('loket')) {
-            $query->whereHas('loket', function ($q) use ($request) {
+            $query->whereHas('lokets', function ($q) use ($request) {
                 $q->where('nama_loket', $request->loket);
             });
         }
@@ -332,13 +328,17 @@ class AdminController extends Controller
     {
         $request->validate([
             'nama_layanan' => 'required|string|max:255',
-            'loket_id'     => 'required|exists:loket,id', 
+            'loket_id'     => 'required', // Bisa berupa array/single ID dari form
         ]);
 
-        Service::create([
+        $layanan = Layanan::create([
             'nama_layanan' => $request->nama_layanan,
-            'loket_id'     => $request->loket_id,
         ]);
+
+        // Simpan relasi ke tabel pivot
+        if ($request->filled('loket_id')) {
+            $layanan->lokets()->sync($request->loket_id);
+        }
 
         return back()->with('success', 'Layanan berhasil ditambahkan!');
     }
@@ -347,21 +347,27 @@ class AdminController extends Controller
     {
         $request->validate([
             'nama_layanan' => 'required|string|max:255',
-            'loket_id'     => 'required|exists:loket,id',
+            'loket_id'     => 'required', // Pastikan loket terpilih
         ]);
 
-        $layanan = Service::findOrFail($id);
+        $layanan = Layanan::findOrFail($id);
+        
         $layanan->update([
             'nama_layanan' => $request->nama_layanan,
-            'loket_id'     => $request->loket_id,
         ]);
+
+        // Perbarui relasi loket menggunakan sync
+        if ($request->filled('loket_id')) {
+            $layanan->lokets()->sync($request->loket_id);
+        }
 
         return back()->with('success', 'Layanan berhasil diperbarui!');
     }
 
     public function destroyLayanan($id)
     {
-        $layanan = Service::findOrFail($id);
+        $layanan = Layanan::findOrFail($id);
+        $layanan->lokets()->detach();
         $layanan->delete();
 
         return back()->with('success', 'Layanan berhasil dihapus!');
@@ -392,18 +398,16 @@ class AdminController extends Controller
 
         $antreans = $query->latest()->get();
         $lokets   = Loket::all();      
-        $layanans = Service::all();
+        $layanans = Layanan::all();
 
         return view('admin.rekap', compact('antreans', 'lokets', 'layanans'));
     }
 
     public function exportRekapExcel(Request $request)
     {
-        // Menyesuaikan dengan form input start_date & end_date di Blade kamu
         $startDate = $request->input('start_date', date('Y-m-d'));
         $endDate   = $request->input('end_date', date('Y-m-d'));
 
-        // Ambil data antrean sesuai rentang tanggal yang dipilih di filter
         $antreans = Antrean::with(['serviceAwal', 'serviceAktual', 'loketPelayanan', 'petugas'])
             ->whereBetween('tanggal', [$startDate, $endDate])
             ->get();
@@ -413,35 +417,29 @@ class AdminController extends Controller
         }
 
         $spreadsheet = new Spreadsheet();
-        $spreadsheet->removeSheetByIndex(0); // Hapus sheet default bawaan
+        $spreadsheet->removeSheetByIndex(0); 
 
         // ==========================================
-        // 1. SHEET DASHBOARD & CHART (DI DEPAN)
+        // 1. SHEET DASHBOARD & CHART
         // ==========================================
         $sheetDash = $spreadsheet->createSheet(0);
         $sheetDash->setTitle('Dashboard');
 
-        // Judul Dashboard
         $sheetDash->setCellValue('A1', 'DASHBOARD REKAPITULASI PELAYANAN ANTREAN');
         $sheetDash->getStyle('A1')->getFont()->setBold(true)->setSize(14);
 
-        // Hitung Statistik Ringkasan
         $totalKeluhan  = $antreans->count();
         $totalSelesai  = $antreans->where('status', 'DONE')->count();
         $totalProses   = $antreans->where('status', 'WAITING')->count();
         $totalBatal    = $antreans->whereNotIn('status', ['DONE', 'WAITING'])->count();
         $persenSelesai = $totalKeluhan > 0 ? round(($totalSelesai / $totalKeluhan) * 100, 1) . '%' : '0%';
 
-        // Tabel Ringkasan Kartu Statistik (Kiri Atas)
         $sheetDash->setCellValue('A3', 'Total Pengunjung');      $sheetDash->setCellValue('B3', $totalKeluhan);
         $sheetDash->setCellValue('A4', 'Selesai');                $sheetDash->setCellValue('B4', $totalSelesai);
         $sheetDash->setCellValue('A5', 'Dalam Proses (Waiting)'); $sheetDash->setCellValue('B5', $totalProses);
         $sheetDash->setCellValue('A6', 'Belum Selesai / Batal');  $sheetDash->setCellValue('B6', $totalBatal);
         $sheetDash->setCellValue('A7', '% Penyelesaian');         $sheetDash->setCellValue('B7', $persenSelesai);
 
-
-        // --- KUMPULKAN DATA UNTUK CHART ---
-        // A. Pengunjung Per Hari (Sesuai rentang tanggal yang di-filter)
         $period = \Carbon\CarbonPeriod::create($startDate, $endDate);
         $dataPerHari = [];
         foreach ($period as $date) {
@@ -450,21 +448,16 @@ class AdminController extends Controller
             $dataPerHari[$tglLabel] = $antreans->where('tanggal', $tglStr)->count();
         }
 
-        // B. Pengunjung Per Loket
         $dataPerLoket = $antreans->groupBy(function($item) {
             return $item->loketPelayanan->nama_loket ?? 'Umum';
         })->map->count();
 
-        // C. Status Penyelesaian
         $dataStatus = [
             'Selesai' => $totalSelesai,
             'Dalam Proses' => $totalProses,
             'Belum Selesai/Batal' => $totalBatal
         ];
 
-
-        // --- MASUKKAN DATA PENDUKUNG CHART KE KOLOM TERSEMBUNYI ---
-        // 1. Data Chart Harian (Kolom P & Q)
         $r = 3;
         $sheetDash->setCellValue('P2', 'Tanggal'); $sheetDash->setCellValue('Q2', 'Jumlah');
         foreach ($dataPerHari as $tgl => $jml) {
@@ -474,7 +467,6 @@ class AdminController extends Controller
         }
         $endHariRow = $r - 1;
 
-        // 2. Data Chart Loket (Kolom S & T)
         $r = 3;
         $sheetDash->setCellValue('S2', 'Loket'); $sheetDash->setCellValue('T2', 'Jumlah');
         foreach ($dataPerLoket as $loket => $jml) {
@@ -484,7 +476,6 @@ class AdminController extends Controller
         }
         $endLoketRow = $r - 1;
 
-        // 3. Data Chart Status (Kolom V & W)
         $r = 3;
         $sheetDash->setCellValue('V2', 'Status'); $sheetDash->setCellValue('W2', 'Jumlah');
         foreach ($dataStatus as $status => $jml) {
@@ -494,14 +485,10 @@ class AdminController extends Controller
         }
         $endStatusRow = $r - 1;
 
-
-        // --- BUAT 6 CHART & TEMPEL DI SHEET DASHBOARD ---
-        
         if (count($dataPerHari) > 0) {
             $catHari = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'Dashboard'!\$P\$3:\$P\${$endHariRow}", null, count($dataPerHari))];
             $valHari = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'Dashboard'!\$Q\$3:\$Q\${$endHariRow}", null, count($dataPerHari))];
             
-            // 1. Chart Pengunjung Tiap Hari (Bar Chart)
             $serHariBar = new DataSeries(DataSeries::TYPE_BARCHART, DataSeries::GROUPING_STANDARD, range(0, count($valHari)-1), [], $catHari, $valHari);
             $pltHariBar = new PlotArea(null, [$serHariBar]);
             $chtHariBar = new Chart('chart_hari_bar', new Title('Pengunjung Tiap Hari (Bar Chart)'), new Legend(Legend::POSITION_RIGHT, null, false), $pltHariBar);
@@ -509,7 +496,6 @@ class AdminController extends Controller
             $chtHariBar->setBottomRightPosition('K14');
             $sheetDash->addChart($chtHariBar);
 
-            // 2. Chart Pengunjung Tiap Hari (Pie Chart)
             $serHariPie = new DataSeries(DataSeries::TYPE_PIECHART, DataSeries::GROUPING_STANDARD, range(0, count($valHari)-1), [], $catHari, $valHari);
             $pltHariPie = new PlotArea(null, [$serHariPie]);
             $chtHariPie = new Chart('chart_hari_pie', new Title('Pengunjung Tiap Hari (Pie Chart)'), new Legend(Legend::POSITION_RIGHT, null, false), $pltHariPie);
@@ -522,7 +508,6 @@ class AdminController extends Controller
             $catLoket = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'Dashboard'!\$S\$3:\$S\${$endLoketRow}", null, count($dataPerLoket))];
             $valLoket = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'Dashboard'!\$T\$3:\$T\${$endLoketRow}", null, count($dataPerLoket))];
             
-            // 3. Chart Pengunjung Tiap Loket (Bar Chart)
             $serLoketBar = new DataSeries(DataSeries::TYPE_BARCHART, DataSeries::GROUPING_STANDARD, range(0, count($valLoket)-1), [], $catLoket, $valLoket);
             $pltLoketBar = new PlotArea(null, [$serLoketBar]);
             $chtLoketBar = new Chart('chart_loket_bar', new Title('Pengunjung Tiap Loket (Bar Chart)'), new Legend(Legend::POSITION_RIGHT, null, false), $pltLoketBar);
@@ -530,7 +515,6 @@ class AdminController extends Controller
             $chtLoketBar->setBottomRightPosition('K40');
             $sheetDash->addChart($chtLoketBar);
 
-            // 4. Chart Pengunjung Tiap Loket (Pie Chart)
             $serLoketPie = new DataSeries(DataSeries::TYPE_PIECHART, DataSeries::GROUPING_STANDARD, range(0, count($valLoket)-1), [], $catLoket, $valLoket);
             $pltLoketPie = new PlotArea(null, [$serLoketPie]);
             $chtLoketPie = new Chart('chart_loket_pie', new Title('Pengunjung Tiap Loket (Pie Chart)'), new Legend(Legend::POSITION_RIGHT, null, false), $pltLoketPie);
@@ -542,7 +526,6 @@ class AdminController extends Controller
         $catStatus = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'Dashboard'!\$V\$3:\$V\${$endStatusRow}", null, count($dataStatus))];
         $valStatus = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'Dashboard'!\$W\$3:\$W\${$endStatusRow}", null, count($dataStatus))];
         
-        // 5. Chart Status Penyelesaian (Bar Chart)
         $serStatusBar = new DataSeries(DataSeries::TYPE_BARCHART, DataSeries::GROUPING_STANDARD, range(0, count($valStatus)-1), [], $catStatus, $valStatus);
         $pltStatusBar = new PlotArea(null, [$serStatusBar]);
         $chtStatusBar = new Chart('chart_status_bar', new Title('Status Penyelesaian (Bar Chart)'), new Legend(Legend::POSITION_RIGHT, null, false), $pltStatusBar);
@@ -550,7 +533,6 @@ class AdminController extends Controller
         $chtStatusBar->setBottomRightPosition('K66');
         $sheetDash->addChart($chtStatusBar);
 
-        // 6. Chart Status Penyelesaian (Pie Chart)
         $serStatusPie = new DataSeries(DataSeries::TYPE_PIECHART, DataSeries::GROUPING_STANDARD, range(0, count($valStatus)-1), [], $catStatus, $valStatus);
         $pltStatusPie = new PlotArea(null, [$serStatusPie]);
         $chtStatusPie = new Chart('chart_status_pie', new Title('Status Penyelesaian (Pie Chart)'), new Legend(Legend::POSITION_RIGHT, null, false), $pltStatusPie);
@@ -558,9 +540,8 @@ class AdminController extends Controller
         $chtStatusPie->setBottomRightPosition('K79');
         $sheetDash->addChart($chtStatusPie);
 
-
         // ==========================================
-        // 2. SHEET REKAPITULASI PER TANGGAL (MULTI-SHEET)
+        // 2. SHEET REKAPITULASI PER TANGGAL
         // ==========================================
         $groupedByDate = $antreans->groupBy('tanggal');
 
@@ -577,14 +558,12 @@ class AdminController extends Controller
 
             $sheetData->fromArray($headers, NULL, 'A1');
 
-            // Styling Header Table
             $sheetData->getStyle('A1:N1')->getFont()->setBold(true);
             $sheetData->getStyle('A1:N1')->getFill()
                 ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
                 ->getStartColor()->setARGB('001F3F');
             $sheetData->getStyle('A1:N1')->getFont()->getColor()->setARGB('FFFFFF');
 
-            // Aktifkan Filter (Dropdown) pada Header Tabel
             $lastRowData = count($items) + 1;
             $sheetData->setAutoFilter("A1:N{$lastRowData}");
 
@@ -612,7 +591,6 @@ class AdminController extends Controller
                 $row++;
             }
         }
-
 
         // ==========================================
         // 3. OUTPUT FILE EXCEL
