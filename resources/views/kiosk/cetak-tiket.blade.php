@@ -69,7 +69,7 @@
         <!-- NOMOR ANTREAN UTAMA -->
         <div class="py-2">
             <span class="block text-5xl md:text-6xl font-black text-slate-900 tracking-tight leading-none">
-                {{ $loket->nomor_loket }} - {{ sprintf('%03d', $antrean->nomor_antrean) }}
+                L{{ $loket->nomor_loket }} - {{ sprintf('%03d', $antrean->nomor_antrean) }}
             </span>
         </div>
 

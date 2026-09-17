@@ -66,11 +66,10 @@ class KioskController extends Controller
         $layananId = $request->input('layanan_id');
 
         try {
-            // Simpan data antrean ke database menggunakan Database Transaction
             $antrean = DB::transaction(function () use ($request, $layananId) {
                 $today = now()->toDateString();
 
-                // Cek apakah sesi antrean hari ini dibuka
+                // Cek sesi antrean hari ini
                 $sesi = SesiHari::where('is_open', true)
                     ->where('tanggal', $today)
                     ->latest()
@@ -81,45 +80,57 @@ class KioskController extends Controller
                     throw new \RuntimeException('Sesi antrean saat ini sedang ditutup oleh Admin!');
                 }
 
-                // AMBIL DATA LAYANAN & LOKETNYA LANGSUNG DI DALAM TRANSAKSI
+                // Ambil data layanan beserta loket-loket yang terhubung
                 $layanan = Service::with('lokets')->findOrFail($layananId);
-                $loket = $layanan->lokets->first();
+                $lokets  = $layanan->lokets;
 
-                if (!$loket) {
-                    $loket = Loket::first();
+                if ($lokets->isEmpty()) {
+                    throw new \RuntimeException('Belum ada loket yang terhubung dengan layanan ini!');
                 }
 
-                if (!$loket) {
-                    throw new \RuntimeException('Data Loket di database masih kosong. Harap tambahkan loket terlebih dahulu.');
+                // ------------------------------------------------------------------
+                // 1. LOGIKA BERGANTIAN SEIMBANG (ROUND-ROBIN)
+                // ------------------------------------------------------------------
+                if ($lokets->count() > 1) {
+                    // Cek tiket terakhir yang dicetak khusus untuk layanan ini hari ini
+                    $lastServiceAntrean = Antrean::where('tanggal', $today)
+                        ->where('service_awal_id', $layanan->id)
+                        ->orderBy('id', 'desc')
+                        ->first();
+
+                    if ($lastServiceAntrean) {
+                        // Cari posisi loket yang menangani tiket terakhir
+                        $lastLoketId  = $lastServiceAntrean->loket_asal_id;
+                        $currentIndex = $lokets->pluck('id')->search($lastLoketId);
+
+                        // Oper giliran ke loket berikutnya
+                        $nextIndex     = ($currentIndex !== false && $currentIndex < $lokets->count() - 1) ? $currentIndex + 1 : 0;
+                        $loketTerpilih = $lokets->get($nextIndex);
+                    } else {
+                        // Tiket pertama hari ini: mulai dari loket urutan awal
+                        $loketTerpilih = $lokets->first();
+                    }
+                } else {
+                    $loketTerpilih = $lokets->first();
                 }
 
-                // Ambil ID loket dengan aman
-                $loketId = $loket->id;
+                $loketId = $loketTerpilih->id;
 
-                // Hitung nomor antrean berikutnya untuk loket tersebut
-                $lastAntrean = Antrean::where('tanggal', $today)
-                    ->where('loket_pelayanan_id', $loketId)
+                // ------------------------------------------------------------------
+                // 2. HITUNG NOMOR ANTREAN LOKET TERPILIH (BERDASARKAN LOKET_ASAL_ID)
+                // ------------------------------------------------------------------
+                $lastLoketAntrean = Antrean::where('tanggal', $today)
+                    ->where('loket_asal_id', $loketId)
                     ->orderBy('id', 'desc')
                     ->first();
 
-                $nomorBaru = $lastAntrean ? ((int) $lastAntrean->nomor_antrean) + 1 : 1;
-
-                dd([
-    'loket_id_yang_dicari' => $loket->id ?? 'KOSONG',
-    'data_yang_mau_disimpan' => [
-        'tanggal' => $today,
-        'loket_asal_id' => $loket->id ?? null,
-        'loket_pelayanan_id' => $loket->id ?? null,
-        'service_awal_id' => $layanan->id,
-        'nama' => $request->nama,
-    ]
-]);
+                $nomorBaru = $lastLoketAntrean ? ((int) $lastLoketAntrean->nomor_antrean) + 1 : 1;
 
                 return Antrean::create([
                     'tanggal'            => $today,
                     'loket_asal_id'      => $loketId,
                     'loket_pelayanan_id' => $loketId,
-                    'service_awal_id'    => $layanan->id, 
+                    'service_awal_id'    => $layanan->id,
                     'petugas_id'         => null,
                     'nomor_antrean'      => $nomorBaru,
                     'status'             => 'PRINTING',

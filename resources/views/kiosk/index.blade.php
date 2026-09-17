@@ -91,14 +91,14 @@
                         </div>
 
                         <div>
-                            <label class="block text-xs md:text-sm font-bold mb-1">No. HP (Opsional)</label>
-                            <input type="text" name="no_hp" id="input-nohp" placeholder="Contoh: 081234567890"
+                            <label class="block text-xs md:text-sm font-bold mb-1">No. HP <span class="text-ut-yellow">*</span></label>
+                            <input type="text" name="no_hp" id="input-nohp" required placeholder="Contoh: 081234567890"
                                 class="w-full px-4 py-3 rounded-xl text-slate-900 font-semibold text-sm border-none focus:ring-4 focus:ring-ut-yellow outline-none transition">
                         </div>
 
                         <div>
-                            <label class="block text-xs md:text-sm font-bold mb-1">Kendala (Opsional)</label>
-                            <input type="text" name="kendala" id="input-kendala" placeholder="Tuliskan singkat kendala Anda"
+                            <label class="block text-xs md:text-sm font-bold mb-1">Kendala <span class="text-ut-yellow">*</span></label>
+                            <input type="text" name="kendala" id="input-kendala" required placeholder="Tuliskan singkat kendala Anda"
                                 class="w-full px-4 py-3 rounded-xl text-slate-900 font-semibold text-sm border-none focus:ring-4 focus:ring-ut-yellow outline-none transition">
                         </div>
                     </div>

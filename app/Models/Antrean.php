@@ -10,7 +10,7 @@ use App\Models\Service;
 
 class Antrean extends Model
 {
-    protected $table = 'antreans';
+    protected $table = 'antrean';
     
     protected $fillable = [
         'tanggal',
@@ -56,5 +56,10 @@ class Antrean extends Model
     public function serviceAktual()
     {
         return $this->belongsTo(Service::class, 'service_aktual_id');
+    }
+
+    public function logs()
+    {
+        return $this->hasMany(AntreanLog::class, 'antrean_id');
     }
 }

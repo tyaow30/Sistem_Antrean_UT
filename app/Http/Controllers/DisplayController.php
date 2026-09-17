@@ -18,15 +18,15 @@ class DisplayController extends Controller
     {
         $today = now()->toDateString();
 
-        // Ambil antrean yang sedang dipanggil/dilayani (dari semua loket)
-        $antreanAktif = Antrean::with('loketAsal')
+        // Ambil antrean yang sedang dipanggil/dilayani (sertakan relasi loketPelayanan dan loketAsal)
+        $antreanAktif = Antrean::with(['loketPelayanan', 'loketAsal'])
             ->where('tanggal', $today)
             ->whereIn('status', ['CALLED', 'SERVING'])
             ->orderBy('updated_at', 'desc')
             ->first();
 
-        // Ambil riwayat 5 antrean terakhir yang dipanggil
-        $riwayat = Antrean::with('loketAsal')
+        // Ambil riwayat antrean terakhir yang dipanggil
+        $riwayat = Antrean::with(['loketPelayanan', 'loketAsal'])
             ->where('tanggal', $today)
             ->whereIn('status', ['CALLED', 'SERVING', 'DONE'])
             ->orderBy('updated_at', 'desc')
