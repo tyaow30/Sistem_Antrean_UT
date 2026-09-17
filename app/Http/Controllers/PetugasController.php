@@ -124,47 +124,48 @@ class PetugasController extends Controller
     }
 
     public function selanjutnya()
-{
-    /** @var User $user */
-    $user = auth()->user();
-    $today = now()->toDateString();
+    {
+        /** @var User $user */
+        $user = auth()->user();
+        $today = now()->toDateString();
 
-    $loket = Loket::find($user->assigned_loket_id);
+        $loket = Loket::find($user->assigned_loket_id);
 
-    if (!$loket) {
-        return back()->with('error', 'Loket petugas tidak valid.');
+        if (!$loket) {
+            return back()->with('error', 'Loket petugas tidak valid.');
+        }
+
+        // 1. Cek apakah loket petugas ini masih memegang antrean aktif
+        $sedangDilayani = Antrean::where('tanggal', $today)
+            ->where('loket_pelayanan_id', $loket->id)
+            ->whereIn('status', ['PREPARING', 'CALLED', 'SERVING'])
+            ->exists();
+
+        if ($sedangDilayani) {
+            return back()->with('error', 'Selesaikan atau lewati antrean saat ini terlebih dahulu!');
+        }
+
+        // 2. Ambil antrean WAITING yang memang milik loket ini
+        $antrean = Antrean::where('tanggal', $today)
+            ->where('loket_pelayanan_id', $loket->id)
+            ->where('status', 'WAITING')
+            ->orderBy('id', 'asc') // Urut berdasarkan siapa yang datang duluan di loket tersebut
+            ->first();
+
+        if (!$antrean) {
+            return back()->with('error', 'Tidak ada antrean tersisa di loket Anda.');
+        }
+
+        // 3. Ubah status jadi PREPARING untuk dipanggil di loket ini
+        $antrean->update([
+            'status' => 'PREPARING',
+            'petugas_id' => $user->id,
+        ]);
+        
+
+        return back()->with('success', 'Data antrean nomor ' . $antrean->nomor_antrean . ' berhasil disiapkan.');
     }
 
-    // 1. Cek apakah loket petugas ini masih memegang antrean aktif
-    $sedangDilayani = Antrean::where('tanggal', $today)
-        ->where('loket_pelayanan_id', $loket->id)
-        ->whereIn('status', ['PREPARING', 'CALLED', 'SERVING'])
-        ->exists();
-
-    if ($sedangDilayani) {
-        return back()->with('error', 'Selesaikan atau lewati antrean saat ini terlebih dahulu!');
-    }
-
-    // 2. Ambil antrean WAITING yang memang milik loket ini
-    $antrean = Antrean::where('tanggal', $today)
-        ->where('loket_pelayanan_id', $loket->id)
-        ->where('status', 'WAITING')
-        ->orderBy('id', 'asc') // Urut berdasarkan siapa yang datang duluan di loket tersebut
-        ->first();
-
-    if (!$antrean) {
-        return back()->with('error', 'Tidak ada antrean tersisa di loket Anda.');
-    }
-
-    // 3. Ubah status jadi PREPARING untuk dipanggil di loket ini
-    $antrean->update([
-        'status' => 'PREPARING',
-        'petugas_id' => $user->id,
-    ]);
-    
-
-    return back()->with('success', 'Data antrean nomor ' . $antrean->nomor_antrean . ' berhasil disiapkan.');
-}
     public function panggilBantuan($id)
     {
         /** @var User $user */
@@ -458,8 +459,8 @@ class PetugasController extends Controller
         }
 
         $riwayatAntrean = $query->orderBy('tanggal', 'asc')
-                                    ->orderBy('waktu_selesai', 'desc')
-                                    ->get();
+                                ->orderBy('waktu_selesai', 'desc')
+                                ->get();
 
         $totalSelesai = $riwayatAntrean->where('status', 'DONE')->count();
         $totalDilewati = $riwayatAntrean->where('status', 'SKIPPED')->count();
@@ -489,98 +490,26 @@ class PetugasController extends Controller
         }
 
         $spreadsheet = new Spreadsheet();
-        
-        // ==========================================
-        // SHEET 1: DATA ANTREAN
-        // ==========================================
-        $sheetData = $spreadsheet->getActiveSheet();
-        $sheetData->setTitle('Data Antrean');
 
-        // Loket Awal & Loket Akhir (Tujuan)
+        // 1. Grouping Data Antrean Berdasarkan Tanggal (Format: dd-mm-yyyy untuk nama sheet)
+        $antreansByDate = $antreans->groupBy(function ($item) {
+            return Carbon::parse($item->tanggal)->format('d-m-Y');
+        });
+
+        // Header Kolom Data
         $headers = [
-            'No', 'Tanggal', 'Nama/Identitas Pelapor', 'Status Pelapor',
+            'No', 'Tanggal', 'Nama/Identitas Pelapor', 'No. HP', 'Status Pelapor',
             'Jenis Keluhan', 'Subjek/Uraian Keluhan', 'Media Penyampaian',
             'Loket Awal', 'Loket Akhir (Tujuan)', 'Unit/Petugas Penanganan', 
             'Tindak Lanjut', 'Status Penyelesaian', 'Tanggal Selesai', 
             'Lama Penyelesaian (Hari)', 'Kepuasan Setelah Penyelesaian', 'Keterangan'
         ];
 
-        $sheetData->fromArray($headers, NULL, 'A1');
-        $sheetData->getStyle('A1:P1')->getFont()->setBold(true);
-        $sheetData->getStyle('A1:P1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('001F3F');
-        $sheetData->getStyle('A1:P1')->getFont()->getColor()->setARGB('FFFFFF');
-
-        $row = 2;
-        $no = 1;
-        foreach ($antreans as $item) {
-            $namaLayanan = $item->serviceAwal->nama_layanan ?? ($item->serviceAktual->nama_layanan ?? 'Layanan Umum');
-            $statusSelesai = $item->status == 'DONE' ? 'Selesai' : ($item->status == 'SKIPPED' ? 'Dilewati' : 'Proses');
-            $tglSelesai = $item->status == 'DONE' && $item->updated_at ? Carbon::parse($item->updated_at)->format('d/m/Y') : '';
-            
-            $lamaPenyelesaian = 0;
-            if ($item->waktu_selesai && $item->tanggal) {
-                $lamaPenyelesaian = Carbon::parse($item->tanggal)->diffInDays(Carbon::parse($item->waktu_selesai));
-            }
-
-           // Ambil informasi Loket Awal & Tujuan berdasarkan tabel antrean yang baru
-            if (!empty($item->loket_asal_id)) {
-                // Jika antrean ini adalah hasil alihan dari loket lain
-                $loketAwalNama = 'Loket ' . $item->loket_asal_id;
-                $loketAkhirNama = 'Loket ' . $item->loket_pelayanan_id; 
-            } else {
-                // Jika antrean normal (tidak pernah dialihkan)
-                $loketAwalNama = 'Loket ' . $item->loket_pelayanan_id; 
-                $loketAkhirNama = 'Sama (Tidak Dialihkan)'; 
-            }
-            
-            // Update Status Penyelesaian agar langsung membaca kolom status_penyelesaian di tabel
-            $statusSelesai = $item->status_penyelesaian ?? ($item->status == 'DONE' ? 'Selesai' : 'Proses');
-
-            $sheetData->setCellValue('A' . $row, $no++);
-            $sheetData->setCellValue('B' . $row, Carbon::parse($item->tanggal)->format('Y-m-d'));
-            $sheetData->setCellValue('C' . $row, $item->nama ?? 'Mahasiswa');
-            $sheetData->setCellValue('D' . $row, 'Mahasiswa');
-            $sheetData->setCellValue('E' . $row, $namaLayanan);
-            $sheetData->setCellValue('F' . $row, 'Pelayanan Antrean ' . $namaLayanan);
-            $sheetData->setCellValue('G' . $row, 'Tatapmuka/Kiosk');
-            $sheetData->setCellValue('H' . $row, $loketAwalNama);       // Kolom Loket Awal
-            $sheetData->setCellValue('I' . $row, $loketAkhirNama);      // Kolom Loket Akhir (Tujuan)
-            $sheetData->setCellValue('J' . $row, 'Loket ' . $loket->id . ' / ' . ($item->petugas->name ?? 'Petugas'));
-            $sheetData->setCellValue('K' . $row, $item->status == 'DONE' ? 'Telah dilayani' : 'Proses/Lainnya');
-            $sheetData->setCellValue('L' . $row, $statusSelesai);       // Status Penyelesaian geser ke Kolom L
-            $sheetData->setCellValue('M' . $row, $tglSelesai);
-            $sheetData->setCellValue('N' . $row, $lamaPenyelesaian);
-            $sheetData->setCellValue('O' . $row, 'Puas');
-            $sheetData->setCellValue('P' . $row, 'Data Loket ' . $loket->id);
-            $row++;
-        }
-
-        $lastRow = $row - 1;
-
-        // Aktifkan AutoFilter untuk range A1 sampai P (Kolom ke-16)
-        if ($lastRow >= 1) {
-            $sheetData->setAutoFilter('A1:P' . max(2, $lastRow));
-        }
-
-        // Terapkan Dropdown (Data Validation) pada Kolom L (Status Penyelesaian) baris 2 sampai akhir
-        if ($lastRow >= 2) {
-            for ($i = 2; $i <= $lastRow; $i++) {
-                $validation = $sheetData->getCell('L' . $i)->getDataValidation();
-                $validation->setType(DataValidation::TYPE_LIST);
-                $validation->setErrorStyle(DataValidation::STYLE_STOP);
-                $validation->setAllowBlank(true);
-                $validation->setShowInputMessage(true);
-                $validation->setShowErrorMessage(true);
-                $validation->setShowDropDown(true);
-                $validation->setFormula1('"Selesai,Dilewati,Proses"');
-            }
-        }
-
         // ==========================================
-        // SHEET 2: DASHBOARD & CHART (TERPISAH)
+        // SHEET 1: DASHBOARD & CHART (Posisi Paling Depan)
         // ==========================================
-        $sheetDashboard = $spreadsheet->createSheet();
-        $sheetDashboard->setTitle('Dashboard & Chart');
+        $sheetDashboard = $spreadsheet->getActiveSheet();
+        $sheetDashboard->setTitle('Dashboard');
 
         $sheetDashboard->setCellValue('B2', 'DASHBOARD REKAPITULASI & GRAFIK ANALITIK LOKET');
         $sheetDashboard->getStyle('B2')->getFont()->setBold(true)->setSize(14)->getColor()->setARGB('001F3F');
@@ -588,7 +517,7 @@ class PetugasController extends Controller
 
         $currRow = 5;
 
-        // --- 1. TABEL & GRAFIK: STATUS PENYELESAIAN ---
+        // --- A. TABEL & GRAFIK: STATUS PENYELESAIAN ---
         $totalSelesai = $antreans->where('status', 'DONE')->count();
         $totalDilewati = $antreans->where('status', 'SKIPPED')->count();
         $totalLainnya = $antreans->whereNotIn('status', ['DONE', 'SKIPPED'])->count();
@@ -616,9 +545,9 @@ class PetugasController extends Controller
         $endStatusRow = $currRow - 1;
 
         try {
-            $dataseriesLabelsStatus = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'Dashboard & Chart'!\$C\$" . $startStatusRow, null, 1)];
-            $xAxisTickValuesStatus   = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'Dashboard & Chart'!\$B\${$startStatusRow}:\$B\${$endStatusRow}", null, 3)];
-            $dataSeriesValuesStatus  = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'Dashboard & Chart'!\$C\${$startStatusRow}:\$C\${$endStatusRow}", null, 3)];
+            $dataseriesLabelsStatus = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'Dashboard'!\$C\$" . $startStatusRow, null, 1)];
+            $xAxisTickValuesStatus   = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'Dashboard'!\$B\${$startStatusRow}:\$B\${$endStatusRow}", null, 3)];
+            $dataSeriesValuesStatus  = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'Dashboard'!\$C\${$startStatusRow}:\$C\${$endStatusRow}", null, 3)];
 
             $seriesStatus = new DataSeries(DataSeries::TYPE_BARCHART, DataSeries::GROUPING_STANDARD, range(0, count($dataSeriesValuesStatus) - 1), $dataseriesLabelsStatus, $xAxisTickValuesStatus, $dataSeriesValuesStatus);
             $seriesStatus->setPlotDirection(DataSeries::DIRECTION_COL);
@@ -643,7 +572,7 @@ class PetugasController extends Controller
 
         $currRow += 3;
 
-        // --- 2. TABEL & GRAFIK: PER HARI / PER LAYANAN ---
+        // --- B. TABEL & GRAFIK: PER HARI / PER LAYANAN ---
         $sheetDashboard->setCellValue("B{$currRow}", 'B. Rekapitulasi Kunjungan Layanan Per Hari');
         $sheetDashboard->getStyle("B{$currRow}")->getFont()->setBold(true);
         $currRow++;
@@ -683,9 +612,9 @@ class PetugasController extends Controller
             $endDayRow = $currRow - 1;
 
             try {
-                $dLabel = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'Dashboard & Chart'!\$C\$" . $startDayRow, null, 1)];
-                $xTick  = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'Dashboard & Chart'!\$B\${$startDayRow}:\$B\${$endDayRow}", null, max(1, ($endDayRow - $startDayRow + 1)))];
-                $dVal   = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'Dashboard & Chart'!\$C\${$startDayRow}:\$C\${$endDayRow}", null, max(1, ($endDayRow - $startDayRow + 1)))];
+                $dLabel = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'Dashboard'!\$C\$" . $startDayRow, null, 1)];
+                $xTick   = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'Dashboard'!\$B\${$startDayRow}:\$B\${$endDayRow}", null, max(1, ($endDayRow - $startDayRow + 1)))];
+                $dVal    = [new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'Dashboard'!\$C\${$startDayRow}:\$C\${$endDayRow}", null, max(1, ($endDayRow - $startDayRow + 1)))];
 
                 $seriesDayBar = new DataSeries(DataSeries::TYPE_BARCHART, DataSeries::GROUPING_STANDARD, range(0, count($dVal) - 1), $dLabel, $xTick, $dVal);
                 $seriesDayBar->setPlotDirection(DataSeries::DIRECTION_COL);
@@ -705,13 +634,122 @@ class PetugasController extends Controller
                 $cDayPie->setBottomRightPosition('T' . ($startDayRow + 8));
                 $sheetDashboard->addChart($cDayPie);
             } catch (\Exception $e) {
-                // Lewati jika error chart harian
+                // Lewati jika error chart
             }
 
             $currRow += 3;
         }
 
-        $spreadsheet->setActiveSheetIndex(1);
+        // ==========================================
+        // 2. GENERATE SHEET UNTUK MASING-MASING TANGGAL
+        // ==========================================
+        foreach ($antreansByDate as $dateStr => $items) {
+            // Buat sheet baru untuk tanggal terkait
+            $sheetData = $spreadsheet->createSheet();
+            $sheetData->setTitle($dateStr); // Nama Sheet: misal 15-09-2026, 16-09-2026, dst.
+
+            // Header Style
+            $sheetData->fromArray($headers, NULL, 'A1');
+            $sheetData->getStyle('A1:Q1')->getFont()->setBold(true);
+            $sheetData->getStyle('A1:Q1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('001F3F');
+            $sheetData->getStyle('A1:Q1')->getFont()->getColor()->setARGB('FFFFFF');
+
+            $row = 2;
+            $no = 1;
+
+            foreach ($items as $item) {
+                $namaLayanan = $item->serviceAwal->nama_layanan ?? ($item->serviceAktual->nama_layanan ?? 'Layanan Umum');
+                
+                // Konversi status dari Sistem Loket (Web) ke Status Penyelesaian Excel
+                if ($item->status === 'DONE') {
+                    $statusSelesai = 'Selesai';
+                } elseif ($item->status === 'SKIPPED') {
+                    $statusSelesai = 'Belum Selesai/Batal';
+                } else {
+                    $statusSelesai = 'Dalam Proses';
+                }
+
+                $tglSelesai = $item->status == 'DONE' && $item->updated_at ? Carbon::parse($item->updated_at)->format('d/m/Y') : '';
+                
+                $lamaPenyelesaian = 0;
+                if ($item->waktu_selesai && $item->tanggal) {
+                    $lamaPenyelesaian = Carbon::parse($item->tanggal)->diffInDays(Carbon::parse($item->waktu_selesai));
+                }
+
+                // Ambil informasi Loket Awal & Tujuan
+                if (!empty($item->loket_asal_id)) {
+                    $loketAwalNama = 'Loket ' . $item->loket_asal_id;
+                    $loketAkhirNama = 'Loket ' . $item->loket_pelayanan_id; 
+                } else {
+                    $loketAwalNama = 'Loket ' . $item->loket_pelayanan_id; 
+                    $loketAkhirNama = 'Sama (Tidak Dialihkan)'; 
+                }
+
+                // Nilai Awal Kolom Tindak Lanjut
+                if (!empty($item->loket_asal_id)) {
+                    $tindakLanjutDefault = 'Dialihkan ke Loket ' . $item->loket_pelayanan_id;
+                } elseif ($item->status === 'DONE') {
+                    $tindakLanjutDefault = 'WhatsApp';
+                } else {
+                    $tindakLanjutDefault = 'Belum Selesai';
+                }
+
+                $sheetData->setCellValue('A' . $row, $no++);
+                $sheetData->setCellValue('B' . $row, Carbon::parse($item->tanggal)->format('Y-m-d'));
+                $sheetData->setCellValue('C' . $row, $item->nama ?? 'Mahasiswa');
+                $sheetData->setCellValue('D' . $row, $item->no_hp ?? '-');
+                $sheetData->setCellValue('E' . $row, 'Mahasiswa');
+                $sheetData->setCellValue('F' . $row, $namaLayanan);
+                $sheetData->setCellValue('G' . $row, 'Pelayanan Antrean ' . $namaLayanan);
+                $sheetData->setCellValue('H' . $row, 'Tatapmuka/Kiosk');
+                $sheetData->setCellValue('I' . $row, $loketAwalNama);
+                $sheetData->setCellValue('J' . $row, $loketAkhirNama);
+                $sheetData->setCellValue('K' . $row, 'Loket ' . $loket->id . ' / ' . ($item->petugas->name ?? 'Petugas')); 
+                $sheetData->setCellValue('L' . $row, $tindakLanjutDefault);                           // Kolom L: Tindak Lanjut
+                $sheetData->setCellValue('M' . $row, $statusSelesai);                                // Kolom M: Status Penyelesaian
+                $sheetData->setCellValue('N' . $row, $tglSelesai);
+                $sheetData->setCellValue('O' . $row, $lamaPenyelesaian);
+                $sheetData->setCellValue('P' . $row, 'Puas');
+                $sheetData->setCellValue('Q' . $row, 'Data Loket ' . $loket->id);
+                $row++;
+            }
+
+            $lastRow = $row - 1;
+
+            // AutoFilter per Sheet Tanggal
+            if ($lastRow >= 1) {
+                $sheetData->setAutoFilter('A1:Q' . max(2, $lastRow));
+            }
+
+            // --- PENERAPAN DATA VALIDATION PER SHEET ---
+            if ($lastRow >= 2) {
+                for ($i = 2; $i <= $lastRow; $i++) {
+                    
+                    // 1. DROPDOWN KOLOM L (Tindak Lanjut)
+                    $validationL = $sheetData->getCell('L' . $i)->getDataValidation();
+                    $validationL->setType(DataValidation::TYPE_LIST);
+                    $validationL->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                    $validationL->setAllowBlank(true);
+                    $validationL->setShowInputMessage(true);
+                    $validationL->setShowErrorMessage(false); // Bisa ketik manual
+                    $validationL->setShowDropDown(true);
+                    $validationL->setFormula1('"WhatsApp,Telepon,Email"');
+
+                    // 2. DROPDOWN KOLOM M (Status Penyelesaian)
+                    $validationM = $sheetData->getCell('M' . $i)->getDataValidation();
+                    $validationM->setType(DataValidation::TYPE_LIST);
+                    $validationM->setErrorStyle(DataValidation::STYLE_STOP);
+                    $validationM->setAllowBlank(true);
+                    $validationM->setShowInputMessage(true);
+                    $validationM->setShowErrorMessage(true);
+                    $validationM->setShowDropDown(true);
+                    $validationM->setFormula1('"Selesai,Belum Selesai/Batal,Dalam Proses"');
+                }
+            }
+        }
+
+        // Set sheet aktif pertama kali saat file dibuka (Dashboard)
+        $spreadsheet->setActiveSheetIndex(0);
 
         $writer = new Xlsx($spreadsheet);
         $writer->setIncludeCharts(true);
