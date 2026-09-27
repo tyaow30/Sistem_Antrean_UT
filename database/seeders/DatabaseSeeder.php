@@ -89,11 +89,11 @@ class DatabaseSeeder extends Seeder
         // Kelompok Atas (Untuk Loket 2 & 3)
         $sAdmReg       = Layanan::firstOrCreate(['nama_layanan' => 'Admisi/Registrasi']);
         $sPembayaran   = Layanan::firstOrCreate(['nama_layanan' => 'Pembayaran']);
-        $sAkademik     = Layanan::firstOrCreate(['nama_layanan' => 'Akademik']);
+        $sAkademik     = Layanan::firstOrCreate(['nama_layanan' => 'Pembelajaran(E-Learning)']);
         $sUjian        = Layanan::firstOrCreate(['nama_layanan' => 'Ujian']);
         $sLayananOnline= Layanan::firstOrCreate(['nama_layanan' => 'Layanan Online']);
         $sSalut        = Layanan::firstOrCreate(['nama_layanan' => 'SALUT']);
-        $sAdministrasi = Layanan::firstOrCreate(['nama_layanan' => 'Administrasi']);
+        $sAdministrasi = Layanan::firstOrCreate(['nama_layanan' => 'Administrasi/Persuratan']);
         $sInformasi    = Layanan::firstOrCreate(['nama_layanan' => 'Informasi']);
         $sLainnya      = Layanan::firstOrCreate(['nama_layanan' => 'Lainnya']);
 
@@ -103,7 +103,7 @@ class DatabaseSeeder extends Seeder
         $sTtdLainnya   = Layanan::firstOrCreate(['nama_layanan' => 'Tanda Tangan Lainnya']);
 
         // Kelompok Bawah (Untuk Loket 1)
-        $sIjazah       = Layanan::firstOrCreate(['nama_layanan' => 'Ijazah']);
+        $sIjazah       = Layanan::firstOrCreate(['nama_layanan' => 'Pengambilan Ijazah']);
         $sYudisium     = Layanan::firstOrCreate(['nama_layanan' => 'Yudisium']);
         $sWisuda       = Layanan::firstOrCreate(['nama_layanan' => 'Wisuda']);
         $sRalatIjazah  = Layanan::firstOrCreate(['nama_layanan' => 'Ralat Ijazah']);

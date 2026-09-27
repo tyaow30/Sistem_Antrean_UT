@@ -10,8 +10,6 @@ use Illuminate\Support\Facades\DB;
 use App\Events\AntreanDipanggil;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
-
-// Use classes PhpSpreadsheet
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
@@ -24,6 +22,7 @@ use PhpOffice\PhpSpreadsheet\Chart\DataSeriesValues;
 use PhpOffice\PhpSpreadsheet\Chart\Legend;
 use PhpOffice\PhpSpreadsheet\Chart\PlotArea;
 use PhpOffice\PhpSpreadsheet\Chart\Title;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 
 class PetugasController extends Controller
 {
@@ -56,6 +55,15 @@ class PetugasController extends Controller
             ->orderBy('id', 'asc')
             ->get();
 
+        $daftarAntreanTertunda = collect();
+        if ($user->assigned_loket_id == 1) {
+            $daftarAntreanTertunda = Antrean::where('tanggal', $today)
+                ->where('loket_pelayanan_id', $user->assigned_loket_id)
+                ->where('status', 'ON_HOLD')
+                ->orderBy('updated_at', 'asc')
+                ->get();
+        }
+
         $batasAktif = now()->subMinutes(10);
         $adaPetugasLainAktif = Loket::where('id', '!=', $user->assigned_loket_id)
             ->whereNotNull('active_petugas_id')
@@ -85,6 +93,7 @@ class PetugasController extends Controller
             'loket',
             'antreanSaatIni',
             'daftarAntreanLoket',
+            'daftarAntreanTertunda',
             'daftarAntreanBantuan',
             'user',
             'daftarLoket'
@@ -135,7 +144,7 @@ class PetugasController extends Controller
             return back()->with('error', 'Loket petugas tidak valid.');
         }
 
-        // 1. Cek apakah loket petugas ini masih memegang antrean aktif
+        // 1. Cek loket petugas ini masih memegang antrean aktif atau tidak
         $sedangDilayani = Antrean::where('tanggal', $today)
             ->where('loket_pelayanan_id', $loket->id)
             ->whereIn('status', ['PREPARING', 'CALLED', 'SERVING'])
@@ -149,7 +158,7 @@ class PetugasController extends Controller
         $antrean = Antrean::where('tanggal', $today)
             ->where('loket_pelayanan_id', $loket->id)
             ->where('status', 'WAITING')
-            ->orderBy('id', 'asc') // Urut berdasarkan siapa yang datang duluan di loket tersebut
+            ->orderBy('id', 'asc') 
             ->first();
 
         if (!$antrean) {
@@ -349,7 +358,7 @@ class PetugasController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
-            'status' => 'required|in:SERVING,DONE,SKIPPED,CALLED,PREPARING',
+            'status' => 'required|in:SERVING,DONE,SKIPPED,CALLED,PREPARING,ON_HOLD',
         ]);
 
         $user = auth()->user();
@@ -382,6 +391,52 @@ class PetugasController extends Controller
         }
 
         return back()->with('success', 'Status antrean berhasil diperbarui.');
+    }
+
+    public function tunda($id)
+    {
+        $user = auth()->user();
+        $today = now()->toDateString();
+        $loket = Loket::find($user->assigned_loket_id);
+
+        $antrean = Antrean::where('id', $id)
+            ->where('tanggal', $today)
+            ->where('loket_pelayanan_id', $loket->id)
+            ->first();
+
+        if (!$antrean) {
+            return back()->with('error', 'Antrean tidak ditemukan atau bukan milik loket ini.');
+        }
+
+        $antrean->update([
+            'status' => 'ON_HOLD'
+        ]);
+
+        return back()->with('success', 'Antrean nomor ' . $antrean->nomor_antrean . ' berhasil ditunda untuk verifikasi IKA.');
+    }
+
+    public function panggilKembali($id)
+    {
+        $user = auth()->user();
+        $today = now()->toDateString();
+        $loket = Loket::find($user->assigned_loket_id);
+
+        $antrean = Antrean::where('id', $id)
+            ->where('tanggal', $today)
+            ->where('loket_pelayanan_id', $loket->id)
+            ->where('status', 'ON_HOLD')
+            ->first();
+
+        if (!$antrean) {
+            return back()->with('error', 'Antrean tertunda tidak ditemukan.');
+        }
+
+        // Dikembalikan ke status PREPARING agar masuk ke kotak biru dan bisa diklik 'Panggil'
+        $antrean->update([
+            'status' => 'PREPARING'
+        ]);
+
+        return back()->with('success', 'Antrean nomor ' . $antrean->nomor_antrean . ' dipanggil kembali.');
     }
 
     public function alihAntrean(Request $request, $id)
@@ -498,11 +553,11 @@ class PetugasController extends Controller
 
         // Header Kolom Data
         $headers = [
-            'No', 'Tanggal', 'Nama/Identitas Pelapor', 'No. HP', 'Status Pelapor',
+            'No', 'Tanggal', 'NIM', 'Nama/Identitas Pelapor', 'No. HP', 'Status Pelapor',
             'Jenis Keluhan', 'Subjek/Uraian Keluhan', 'Media Penyampaian',
             'Loket Awal', 'Loket Akhir (Tujuan)', 'Unit/Petugas Penanganan', 
             'Tindak Lanjut', 'Status Penyelesaian', 'Tanggal Selesai', 
-            'Lama Penyelesaian (Hari)', 'Kepuasan Setelah Penyelesaian', 'Keterangan'
+            'Lama Penyelesaian (Hari)', 'Keterangan'
         ];
 
         // ==========================================
@@ -659,8 +714,6 @@ class PetugasController extends Controller
 
             foreach ($items as $item) {
                 $namaLayanan = $item->serviceAwal->nama_layanan ?? ($item->serviceAktual->nama_layanan ?? 'Layanan Umum');
-                
-                // Konversi status dari Sistem Loket (Web) ke Status Penyelesaian Excel
                 if ($item->status === 'DONE') {
                     $statusSelesai = 'Selesai';
                 } elseif ($item->status === 'SKIPPED') {
@@ -668,15 +721,12 @@ class PetugasController extends Controller
                 } else {
                     $statusSelesai = 'Dalam Proses';
                 }
-
                 $tglSelesai = $item->status == 'DONE' && $item->updated_at ? Carbon::parse($item->updated_at)->format('d/m/Y') : '';
-                
                 $lamaPenyelesaian = 0;
                 if ($item->waktu_selesai && $item->tanggal) {
                     $lamaPenyelesaian = Carbon::parse($item->tanggal)->diffInDays(Carbon::parse($item->waktu_selesai));
                 }
 
-                // Ambil informasi Loket Awal & Tujuan
                 if (!empty($item->loket_asal_id)) {
                     $loketAwalNama = 'Loket ' . $item->loket_asal_id;
                     $loketAkhirNama = 'Loket ' . $item->loket_pelayanan_id; 
@@ -685,7 +735,6 @@ class PetugasController extends Controller
                     $loketAkhirNama = 'Sama (Tidak Dialihkan)'; 
                 }
 
-                // Nilai Awal Kolom Tindak Lanjut
                 if (!empty($item->loket_asal_id)) {
                     $tindakLanjutDefault = 'Dialihkan ke Loket ' . $item->loket_pelayanan_id;
                 } elseif ($item->status === 'DONE') {
@@ -696,20 +745,20 @@ class PetugasController extends Controller
 
                 $sheetData->setCellValue('A' . $row, $no++);
                 $sheetData->setCellValue('B' . $row, Carbon::parse($item->tanggal)->format('Y-m-d'));
-                $sheetData->setCellValue('C' . $row, $item->nama ?? 'Mahasiswa');
-                $sheetData->setCellValue('D' . $row, $item->no_hp ?? '-');
-                $sheetData->setCellValue('E' . $row, 'Mahasiswa');
-                $sheetData->setCellValue('F' . $row, $namaLayanan);
-                $sheetData->setCellValue('G' . $row, 'Pelayanan Antrean ' . $namaLayanan);
-                $sheetData->setCellValue('H' . $row, 'Tatapmuka/Kiosk');
-                $sheetData->setCellValue('I' . $row, $loketAwalNama);
-                $sheetData->setCellValue('J' . $row, $loketAkhirNama);
-                $sheetData->setCellValue('K' . $row, 'Loket ' . $loket->id . ' / ' . ($item->petugas->name ?? 'Petugas')); 
-                $sheetData->setCellValue('L' . $row, $tindakLanjutDefault);                           // Kolom L: Tindak Lanjut
-                $sheetData->setCellValue('M' . $row, $statusSelesai);                                // Kolom M: Status Penyelesaian
-                $sheetData->setCellValue('N' . $row, $tglSelesai);
-                $sheetData->setCellValue('O' . $row, $lamaPenyelesaian);
-                $sheetData->setCellValue('P' . $row, 'Puas');
+                $sheetData->setCellValueExplicit('C' . $row, $item->nim ?? '-', DataType::TYPE_STRING);
+                $sheetData->setCellValue('D' . $row, $item->nama ?? 'Mahasiswa');
+                $sheetData->setCellValueExplicit('E' . $row, $item->no_hp ?? '-', DataType::TYPE_STRING);
+                $sheetData->setCellValue('F' . $row, 'Mahasiswa');
+                $sheetData->setCellValue('G' . $row, $namaLayanan); 
+                $sheetData->setCellValue('H' . $row, 'Pelayanan Antrean ' . $namaLayanan);
+                $sheetData->setCellValue('I' . $row, 'Tatapmuka/Kiosk');
+                $sheetData->setCellValue('J' . $row, $loketAwalNama);
+                $sheetData->setCellValue('K' . $row, $loketAkhirNama);
+                $sheetData->setCellValue('L' . $row, 'Loket ' . $loket->id . ' / ' . ($item->petugas->name ?? 'Petugas')); 
+                $sheetData->setCellValue('M' . $row, $tindakLanjutDefault);                           
+                $sheetData->setCellValue('N' . $row, $statusSelesai);                                
+                $sheetData->setCellValue('O' . $row, $tglSelesai);
+                $sheetData->setCellValue('P' . $row, $lamaPenyelesaian);
                 $sheetData->setCellValue('Q' . $row, 'Data Loket ' . $loket->id);
                 $row++;
             }
@@ -725,25 +774,35 @@ class PetugasController extends Controller
             if ($lastRow >= 2) {
                 for ($i = 2; $i <= $lastRow; $i++) {
                     
-                    // 1. DROPDOWN KOLOM L (Tindak Lanjut)
-                    $validationL = $sheetData->getCell('L' . $i)->getDataValidation();
-                    $validationL->setType(DataValidation::TYPE_LIST);
-                    $validationL->setErrorStyle(DataValidation::STYLE_INFORMATION);
-                    $validationL->setAllowBlank(true);
-                    $validationL->setShowInputMessage(true);
-                    $validationL->setShowErrorMessage(false); // Bisa ketik manual
-                    $validationL->setShowDropDown(true);
-                    $validationL->setFormula1('"WhatsApp,Telepon,Email"');
+                    // 1. DROPDOWN KOLOM STATUS PELAPOR 
+                    $validationF = $sheetData->getCell('F' . $i)->getDataValidation();
+                    $validationF->setType(DataValidation::TYPE_LIST);
+                    $validationF->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                    $validationF->setAllowBlank(true);
+                    $validationF->setShowInputMessage(true);
+                    $validationF->setShowErrorMessage(false);
+                    $validationF->setShowDropDown(true);
+                    $validationF->setFormula1('"Mahasiswa,Calon Mahasiswa,Umum"');
 
-                    // 2. DROPDOWN KOLOM M (Status Penyelesaian)
+                    // 2. DROPDOWN KOLOM TINDAK LANJUT
                     $validationM = $sheetData->getCell('M' . $i)->getDataValidation();
                     $validationM->setType(DataValidation::TYPE_LIST);
-                    $validationM->setErrorStyle(DataValidation::STYLE_STOP);
+                    $validationM->setErrorStyle(DataValidation::STYLE_INFORMATION);
                     $validationM->setAllowBlank(true);
                     $validationM->setShowInputMessage(true);
-                    $validationM->setShowErrorMessage(true);
+                    $validationM->setShowErrorMessage(false);
                     $validationM->setShowDropDown(true);
-                    $validationM->setFormula1('"Selesai,Belum Selesai/Batal,Dalam Proses"');
+                    $validationM->setFormula1('"WhatsApp,Telepon,Email"');
+
+                    // 3. DROPDOWN KOLOM STATUS PENYELESAIAN
+                    $validationN = $sheetData->getCell('N' . $i)->getDataValidation();
+                    $validationN->setType(DataValidation::TYPE_LIST);
+                    $validationN->setErrorStyle(DataValidation::STYLE_STOP);
+                    $validationN->setAllowBlank(true);
+                    $validationN->setShowInputMessage(true);
+                    $validationN->setShowErrorMessage(true);
+                    $validationN->setShowDropDown(true);
+                    $validationN->setFormula1('"Selesai,Belum Selesai/Batal,Dalam Proses"');
                 }
             }
         }

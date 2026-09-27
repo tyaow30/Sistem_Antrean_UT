@@ -64,6 +64,9 @@ Route::middleware(['auth', 'role:PETUGAS'])->group(function () {
     Route::post('/petugas/update-status/{id}', [PetugasController::class, 'updateStatus'])->name('petugas.update-status');
     Route::post('/petugas/alih-antrean/{id}', [PetugasController::class, 'alihAntrean'])->name('petugas.alih-antrean');
     Route::get('/petugas/rekap', [PetugasController::class, 'rekap'])->name('petugas.rekap');
+
+    Route::post('/petugas/antrean/{id}/tunda', [PetugasController::class, 'tunda'])->name('petugas.tunda');
+    Route::post('/petugas/antrean/{id}/panggil-kembali', [PetugasController::class, 'panggilKembali'])->name('petugas.panggil-kembali');
 });
 
 

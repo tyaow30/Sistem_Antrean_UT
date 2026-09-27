@@ -12,14 +12,14 @@ export default defineConfig({
         }),
     ],
 
-    server: {
-        host: '0.0.0.0',
-        port: 5173,
+    // server: {
+    //     host: '0.0.0.0',
+    //     port: 8000,
 
-        hmr: {
-            host: '10.10.30.49',
-        },
+    //     hmr: {
+    //         host: '10.10.30.49',
+    //     },
 
-        origin: 'http://10.10.30.49:5173',
-    },
+    //     // origin: 'http://10.10.30.49:5173',
+    // },
 });

@@ -43,6 +43,7 @@
         @php
             $loketId = $loket->id ?? (Auth::user()->assigned_loket_id ?? 1);
             $namaLoket = $loket->nama_loket ?? ('LOKET ' . $loketId);
+            $namaLayananSaatIni = isset($antreanSaatIni) && $antreanSaatIni && $antreanSaatIni->serviceAwal ? $antreanSaatIni->serviceAwal->nama_layanan : '';
         @endphp
 
         <div class="bg-[#FFCC00] rounded-2xl p-6 mb-6 shadow-md border-b-[6px] border-yellow-600">
@@ -87,9 +88,16 @@
                             <i class="fa-solid fa-id-card w-6 text-center text-xl"></i> 
                             {{ isset($antreanSaatIni) && $antreanSaatIni ? $antreanSaatIni->nim : '-' }}
                         </p>
+                        
+                        <!-- Penambahan Nama Layanan -->
+                        <p class="flex items-center gap-3 text-blue-200 font-semibold border-l-4 border-blue-400 pl-3">
+                            <i class="fa-solid fa-file-signature w-6 text-center text-xl"></i> 
+                            Layanan: {{ isset($antreanSaatIni) && $antreanSaatIni ? ($namaLayananSaatIni ?: 'Tidak diketahui') : '-' }}
+                        </p>
+                        
                         <p class="flex items-center gap-3 text-yellow-300">
                             <i class="fa-solid fa-triangle-exclamation w-6 text-center text-xl"></i> 
-                            {{ isset($antreanSaatIni) && $antreanSaatIni && $antreanSaatIni->kendala ? $antreanSaatIni->kendala : 'Tidak ada kendala khusus' }}
+                            Kendala: {{ isset($antreanSaatIni) && $antreanSaatIni && $antreanSaatIni->kendala ? $antreanSaatIni->kendala : 'Tidak ada' }}
                         </p>
                     </div>
                 </div>
@@ -99,7 +107,6 @@
                     
                     <!-- TOMBOL UTAMA (SELANJUTNYA / PANGGIL / PANGGIL ULANG) -->
                     @if(!isset($antreanSaatIni) || !$antreanSaatIni)
-                        <!-- Jika Belum Ada Antrean Aktif -->
                         <form action="{{ route('petugas.selanjutnya') }}" method="POST" class="m-0">
                             @csrf
                             <button type="submit" class="w-full bg-[#FFCC00] text-[#003B70] font-bold py-3 px-4 rounded-xl shadow-md hover:bg-yellow-500 transition uppercase">
@@ -107,7 +114,6 @@
                             </button>
                         </form>
                     @elseif($antreanSaatIni->status === 'PREPARING')
-                        <!-- Jika Status PREPARING (Sudah Diintip, Siap Dipanggil ke Display) -->
                         <form action="{{ route('petugas.panggil', $antreanSaatIni->id) }}" method="POST" class="m-0">
                             @csrf
                             <button type="submit" class="w-full bg-[#FFCC00] text-[#003B70] font-bold py-3 px-4 rounded-xl shadow-md hover:bg-yellow-500 transition uppercase animate-bounce">
@@ -115,7 +121,6 @@
                             </button>
                         </form>
                     @else
-                        <!-- Jika Status CALLED / SERVING -->
                         <form action="{{ route('petugas.panggil-ulang', $antreanSaatIni->id) }}" method="POST" class="m-0">
                             @csrf
                             <button type="submit" class="w-full bg-[#FFCC00] text-[#003B70] font-bold py-3 px-4 rounded-xl shadow-md hover:bg-yellow-500 transition uppercase">
@@ -142,26 +147,37 @@
                         </button>
                     </form>
 
-                    <!-- TOMBOL LEWATI -->
-                    <form action="{{ isset($antreanSaatIni) && $antreanSaatIni ? route('petugas.lewati', $antreanSaatIni->id) : '#' }}" method="POST" class="m-0">
-                        @csrf
-                        <button type="submit" 
-                            {{ (!isset($antreanSaatIni) || !$antreanSaatIni) ? 'disabled' : '' }}
-                            class="w-full bg-[#D32F2F] text-white font-bold py-3 px-4 rounded-xl shadow-md hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                            LEWATI
-                        </button>
-                    </form>
+                    <!-- TOMBOL LEWATI (Conditional: Jadi HOLD jika Loket 1 & Pengambilan Ijazah) -->
+                    @if(isset($antreanSaatIni) && $antreanSaatIni && $loketId == 1 && strtolower(trim($namaLayananSaatIni)) === 'pengambilan ijazah')
+                        <!-- Tombol HOLD KHUSUS Pengambilan Ijazah -->
+                        <form action="{{ route('petugas.tunda', $antreanSaatIni->id) }}" method="POST" class="m-0">
+                            @csrf
+                            <button type="submit" class="w-full bg-[#F9A825] text-[#003B70] font-extrabold py-3 px-4 rounded-xl shadow-md hover:bg-yellow-600 transition uppercase">
+                                TUNDA (KE IKA)
+                            </button>
+                        </form>
+                    @else
+                        <!-- Tombol LEWATI Default (Merah) untuk Layanan Lainnya -->
+                        <form action="{{ isset($antreanSaatIni) && $antreanSaatIni ? route('petugas.lewati', $antreanSaatIni->id) : '#' }}" method="POST" class="m-0">
+                            @csrf
+                            <button type="submit" 
+                                {{ (!isset($antreanSaatIni) || !$antreanSaatIni) ? 'disabled' : '' }}
+                                class="w-full bg-[#D32F2F] text-white font-bold py-3 px-4 rounded-xl shadow-md hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                LEWATI
+                            </button>
+                        </form>
+                    @endif
                 </div>
             </div>
 
-            <!-- PANEL KANAN : DAFTAR ANTREAN -->
+            <!-- PANEL KANAN : DAFTAR ANTREAN & HOLD -->
             <div class="lg:col-span-2 flex flex-col gap-6">
                 
                 <!-- Kotak Antrean Loket Ini -->
-                <div class="bg-[#004A8D] rounded-2xl p-5 text-white shadow-xl flex-1 flex flex-col">
+                <div class="bg-[#004A8D] rounded-2xl p-5 text-white shadow-xl flex-1 flex flex-col min-h-[200px]">
                     <p class="font-semibold text-sm mb-4">Antrean Loket Ini ({{ isset($daftarAntreanLoket) ? count($daftarAntreanLoket) : 0 }})</p>
                     
-                    <div class="space-y-3 flex-1 overflow-y-auto max-h-[250px] pr-2">
+                    <div class="space-y-3 flex-1 overflow-y-auto max-h-[200px] pr-2">
                         @forelse($daftarAntreanLoket ?? [] as $antre)
                             <div class="bg-[#4C7BAD] bg-opacity-40 p-3 rounded-lg flex justify-between items-center border border-[#7A9EBD]">
                                 <span class="font-bold text-xl">L{{ $loketId }} - {{ str_pad($antre->nomor_antrean, 3, '0', STR_PAD_LEFT) }}</span>
@@ -173,7 +189,33 @@
                     </div>
                 </div>
 
-                <!-- Kotak Antrean Bantuan -->
+                <!-- WIDGET BARU: ANTREAN TERTUNDA (Khusus Loket 1) -->
+                @if($loketId == 1)
+                    <div class="bg-orange-100 rounded-2xl p-5 text-[#003B70] shadow-xl flex-1 flex flex-col border-b-[6px] border-orange-500">
+                        <p class="font-bold text-sm mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left"></i> Antrean Tertunda / Ke Ika ({{ isset($daftarAntreanTertunda) ? count($daftarAntreanTertunda) : 0 }})
+                        </p>
+                        
+                        <div class="space-y-3 flex-1 overflow-y-auto max-h-[200px] pr-2">
+                            @forelse($daftarAntreanTertunda ?? [] as $tunda)
+                                <div class="bg-white p-3 rounded-lg flex justify-between items-center border border-orange-200 shadow-sm">
+                                    <div>
+                                        <span class="font-bold text-lg text-orange-600 block">L1 - {{ str_pad($tunda->nomor_antrean, 3, '0', STR_PAD_LEFT) }}</span>
+                                        <span class="text-xs font-semibold text-gray-600">{{ $tunda->nama ?? 'Nama Pelanggan' }}</span>
+                                    </div>
+                                    <form action="{{ route('petugas.panggil-kembali', $tunda->id) }}" method="POST" class="m-0">
+                                        @csrf
+                                        <button type="submit" class="bg-orange-500 text-white text-xs font-bold py-2 px-3 rounded-md hover:bg-orange-600 transition shadow-sm">PANGGIL LAGI</button>
+                                    </form>
+                                </div>
+                            @empty
+                                <p class="text-sm text-orange-400 text-center py-4 italic">Belum ada antrean yang ditunda.</p>
+                            @endforelse
+                        </div>
+                    </div>
+                @endif
+
+                <!-- Kotak Antrean Bantuan (Khusus Loket 2 & 3) -->
                 @if(in_array($loketId, [2, 3]))
                     @php
                         $partnerLoket = ($loketId == 2) ? 3 : 2;

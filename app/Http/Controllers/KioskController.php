@@ -53,14 +53,16 @@ class KioskController extends Controller
         $request->validate([
             'layanan_id' => 'required|exists:services,id',
             'nama'       => 'required|string|max:100',
-            'nim'        => 'required|string|max:50',
-            'no_hp'      => 'nullable|string|max:20',
-            'kendala'    => 'nullable|string|max:255',
+            'nim'        => 'nullable|string|max:50',
+            'no_hp'      => 'required|string|max:20',
+            'kendala'    => 'required|string|max:255',
         ], [
             'layanan_id.required' => 'Silakan pilih salah satu layanan terlebih dahulu.',
             'layanan_id.exists'   => 'Layanan yang dipilih tidak valid.',
             'nama.required'       => 'Nama lengkap wajib diisi.',
-            'nim.required'        => 'NIM atau NIK wajib diisi.',
+            'nim.nullable'        => 'NIM tidak wajib diisi.',
+            'no_hp.required'      => 'Nomor HP wajib diisi.',
+            'kendala.required'    => 'Kendala wajib diisi.',
         ]);
 
         $layananId = $request->input('layanan_id');

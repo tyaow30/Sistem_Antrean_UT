@@ -43,6 +43,13 @@
         <img src="{{ asset('images/logosby.png') }}" alt="Universitas Terbuka Surabaya" class="h-16 mx-auto object-contain">
     </header>
 
+    @if(isset($antrean->serviceAwal) && $antrean->serviceAwal->nama_layanan === 'Pengambilan Ijazah')
+        <!-- WARNING BOX ON SCREEN (NON-PRINT) -->
+        <div class="no-print mb-4 w-full max-w-[340px] bg-yellow-100 border-2 border-yellow-400 text-yellow-800 px-4 py-3 rounded-2xl shadow-sm text-center text-sm font-bold leading-relaxed">
+            ⚠️ KHUSUS IJAZAH:<br>Silakan menuju ke Ika Pembayaran untuk cek.
+        </div>
+    @endif
+
     <!-- CONTAINER STRUK TIKET -->
     <div class="ticket-box bg-white p-6 rounded-3xl shadow-xl w-full max-w-[340px] text-center border border-slate-200 my-auto">
         
@@ -83,9 +90,21 @@
 
         <div class="border-b border-slate-400 my-3"></div>
 
-        <p class="text-[10px] text-slate-500 font-medium">
-            Harap menunggu nomor Anda dipanggil.
-        </p>
+        @if(isset($antrean->serviceAwal) && $antrean->serviceAwal->nama_layanan === 'Pengambilan Ijazah')
+            <!-- TEKS TERCETAK DI KERTAS KHUSUS IJAZAH -->
+            <div class="border border-slate-800 rounded p-1 mb-2 bg-gray-50">
+                <p class="text-[10px] font-black text-slate-900 leading-tight">
+                    * WAJIB KE IKA DULU *<br>
+                    Silakan menuju ke Ika Pembayaran untuk cek sebelum dilayani.
+                </p>
+            </div>
+        @else
+            <!-- TEKS TERCETAK UNTUK LAYANAN LAIN -->
+            <p class="text-[10px] text-slate-500 font-medium">
+                Harap menunggu nomor Anda dipanggil.
+            </p>
+        @endif
+
         <p class="text-[10px] font-bold text-slate-700 mt-0.5">
             {{ \Carbon\Carbon::parse($antrean->waktu_ambil)->format('d/m/Y') }} | {{ \Carbon\Carbon::parse($antrean->waktu_ambil)->format('H:i') }} WIB
         </p>
@@ -124,6 +143,15 @@
     <footer class="w-full text-center py-4 text-xs font-semibold text-slate-400 no-print">
         &copy; {{ date('Y') }} Universitas Terbuka. All rights reserved.
     </footer>
+
+    @if(isset($antrean->serviceAwal) && $antrean->serviceAwal->nama_layanan === 'Pengambilan Ijazah')
+        <!-- POP-UP SCRIPT UNTUK PENGAMBILAN IJAZAH -->
+        <script>
+            document.addEventListener("DOMContentLoaded", function() {
+                alert("INFORMASI PENTING!\n\nKhusus layanan Pengambilan Ijazah, silakan menuju ke Ika Pembayaran terlebih dahulu untuk cek.");
+            });
+        </script>
+    @endif
 
 </body>
 </html>
